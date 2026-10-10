@@ -20,11 +20,12 @@
 6. [PWA Installation ("Add to Home Screen")](#-pwa-installation-add-to-home-screen)
 7. [On-Device NLP Engine Architecture](#-on-device-nlp-engine-architecture)
 8. [Dual Database Architecture (UltSQL + SQLite Fallback)](#-dual-database-architecture)
-9. [How to Install & Run UltSQL](#-how-to-install--run-ultsql-optional-high-performance-engine)
-10. [Automated Test Suite & Verification](#-automated-test-suite--verification)
-11. [Live 2-Minute Judge Demonstration Script](#-live-2-minute-judge-demonstration-script)
-12. [Project Structure](#-project-structure)
-13. [Git Workflow & Repository](#-git-workflow--repository)
+9. [Universal UltSQL Installation & Setup Guide](#-universal-ultsql-installation--setup-guide)
+10. [Role-Based Access Control (Passenger vs. Staff vs. Admin)](#-role-based-access-control-passenger-public-mode-vs-gmrc-officials--admin)
+11. [Automated Test Suite & Verification](#-automated-test-suite--verification)
+12. [Live 2-Minute Judge Demonstration Script](#-live-2-minute-judge-demonstration-script)
+13. [Project Structure](#-project-structure)
+14. [Git Workflow & Repository](#-git-workflow--repository)
 
 ---
 
