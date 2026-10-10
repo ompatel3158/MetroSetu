@@ -3,7 +3,7 @@
    100% Offline-First Caching Strategy
    ============================================================================ */
 
-const CACHE_NAME = "metrosetu-ops-v6";
+const CACHE_NAME = "metrosetu-ops-v7";
 
 // Core static assets required for the app shell to function offline
 const PRECACHE_ASSETS = [
@@ -87,41 +87,27 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Static Assets: Cache-First strategy
+  // 2. Static Assets: Network-First with Instant Offline Cache Fallback
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached version immediately, fetch update in background (stale-while-revalidate)
-        fetch(event.request)
-          .then((networkResponse) => {
-            if (networkResponse && networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(event.request, networkResponse);
-              });
-            }
-          })
-          .catch(() => {});
-        return cachedResponse;
-      }
-
-      // Not in cache, fetch over network
-      return fetch(event.request)
-        .then((networkResponse) => {
-          if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== "basic") {
-            return networkResponse;
-          }
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && event.request.method === "GET") {
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseToCache);
           });
-          return networkResponse;
-        })
-        .catch(() => {
-          // If HTML navigation fails, return cached index.html
-          if (event.request.mode === "navigate") {
-            return caches.match("/");
-          }
-        });
-    })
+        }
+        return networkResponse;
+      })
+      .catch(async () => {
+        const cachedResponse = await caches.match(event.request, { ignoreSearch: true });
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        if (event.request.mode === "navigate") {
+          return caches.match("/");
+        }
+      })
   );
 });
+
