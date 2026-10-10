@@ -84,7 +84,19 @@ python test_triage.py
 python -m uvicorn main:app --reload --port 8000
 ```
 
-Open your browser to: **`http://localhost:8000/#triage`**
+Open your browser to: **`http://localhost:8000`**
+
+### 🔐 Default Admin & Government Official Login Credentials
+
+By default, MetroSetu opens in **Public Passenger Mode (Zero Login Required)** so any commuter can report a problem immediately via **`🚨 Report`** / **`#passenger`**.
+To access **GMRC Operations, Grievance Triage, Add/Edit Stations, or Manage Staff**, click **`🏛️ Login`** in the top navbar and use these pre-seeded credentials (or click the 1-tap auto-fill buttons inside the login modal):
+
+| Account Type | Username | Password | Assigned Role & Access Level |
+| :--- | :--- | :--- | :--- |
+| **🛡️ Chief Operations Admin** | `admin` | `admin123` | **Full Admin Access**: Dashboard, Grievance Triage, Alerts, **`+ Station`** (Add/Edit/Delete Stations), **`Staff`** (Add/Delete Government Staff Accounts), and **`Re-seed`**. |
+| **👮 Station Controller** | `controller` | `metro123` | **Government Staff Access**: Operations Dashboard, Multilingual Grievance Triage Console (All Queues), and AI Alerts. |
+| **🚨 Chief Safety Officer** | `safety_officer` | `metro123` | **Government Staff Access**: Safety & Security Department Queue, Triage Console, and AI Alerts. |
+| **🛗 Mechanical Engineer** | `lifts_eng` | `metro123` | **Government Staff Access**: Lifts & Escalators Department Queue, Triage Console, and AI Alerts. |
 
 ---
 
@@ -393,9 +405,15 @@ MetroSetu separates **public commuter features (no login required)** from **inte
 
 | Role / Mode | Sign-In Required? | Accessible Features | Default Demo Credentials |
 | :--- | :--- | :--- | :--- |
-| **👤 Normal Passenger (Public Commuter)** | **No Sign-In Needed** | • Prominent **`🚨 Report a Problem`** quick button in navbar<br>• **Public Passenger Helpdesk (`#passenger`)**: Submit complaints in Gujarati, Hindi, Gujlish, or English with instant AI routing & ticket ID<br>• **Live Station Status (`#stations`)**: View station accessibility, lines, and feeder buses (read-only; cannot add/edit/delete stations) | *Public (No Login)* |
-| **👮 GMRC Station Staff / Controller** | **Yes (`🏛️ Official Login`)** | • Everything in Public Mode, PLUS:<br>• **System Operations Dashboard (`#dashboard`)**<br>• **Multilingual Grievance Triage Console (`#triage`)** with trilingual reply dispatch<br>• **Alerts & On-Device AI Diagnostics (`#alerts`)** & fault logging | **Username:** `controller`<br>**Password:** `metro123`<br>*(or `safety_officer` / `metro123`)* |
-| **🛡️ GMRC Chief Admin** | **Yes (`🏛️ Official Login`)** | • Everything in Staff Mode, PLUS:<br>• **`👥 Manage Staff` (`#staff`)**: Create new government staff/official accounts, assign stations & departments, and manage existing staff<br>• **`+ Add Station` (`#station-form`)**, Edit/Delete stations, and **`Re-seed`** database | **Username:** `admin`<br>**Password:** `admin123` |
+| **👤 Normal Passenger (Public Commuter)** | **No Sign-In Needed** | • Prominent **`🚨 Report`** quick button in navbar<br>• **Public Passenger Helpdesk (`#passenger`)**: Submit complaints in Gujarati, Hindi, Gujlish, or English with instant AI routing & ticket ID<br>• **Live Station Status (`#stations`)**: View station accessibility, lines, and feeder buses (read-only; cannot add/edit/delete stations) | *Public (No Login Required)* |
+| **👮 GMRC Station Staff / Controller** | **Yes (`🏛️ Login`)** | • Everything in Public Mode, PLUS:<br>• **System Operations Dashboard (`#dashboard`)**<br>• **Multilingual Grievance Triage Console (`#triage`)** with trilingual reply dispatch<br>• **Alerts & On-Device AI Diagnostics (`#alerts`)** & fault logging | • `controller` / `metro123` *(All Depts)*<br>• `safety_officer` / `metro123` *(Safety)*<br>• `lifts_eng` / `metro123` *(Lifts & Escalators)* |
+| **🛡️ GMRC Chief Admin** | **Yes (`🏛️ Login`)** | • Everything in Staff Mode, PLUS:<br>• **`Staff` (`#staff`)**: Create new government staff/official accounts, assign stations & departments, and revoke accounts<br>• **`+ Station` (`#station-form`)**, Edit/Delete stations, and **`Re-seed`** database | • **Username:** `admin`<br>• **Password:** `admin123` |
+
+### How Admin Adds New Government Staff Accounts (`#staff`):
+1. Click **`🏛️ Login`** in the top-right navbar and sign in as **Admin** (`admin` / `admin123`).
+2. Click **`Staff`** in the navbar (or navigate to `http://localhost:8000/#staff`).
+3. Fill out the **+ Add New Government Staff Account** form (Full Name, Username, Password, Role `staff` or `admin`, Assigned Department Queue, Designation, and Station) and click **Create Official Account**.
+4. The new account is immediately persisted to SQLite/UltSQL (`staff_users` table) and can sign in right away via **`🏛️ Login`**.
 
 ---
 
