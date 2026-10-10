@@ -12,12 +12,12 @@
   <link rel="apple-touch-icon" href="/static/icon-192.svg">
 
   <!-- Local Bundled Stylesheet (Zero external fonts or CDNs) -->
-  <link rel="stylesheet" href="/static/css/app.css?v=7">
+  <link rel="stylesheet" href="/static/css/app.css?v=8">
 </head>
 <body>
 
   <!-- ========================================================================
-       TOP NAVIGATION BAR
+       TOP NAVIGATION BAR (SLEEK COMPACT SINGLE-LINE)
        ======================================================================== -->
   <header class="navbar">
     <div class="navbar-left">
@@ -29,8 +29,7 @@
       </button>
 
       <!-- Brand Identity -->
-      <div class="brand-section">
-        <!-- Inline SVG Logo: Metro / Transit Train -->
+      <a href="#passenger" class="brand-section">
         <svg class="brand-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="4" y="3" width="16" height="16" rx="2"></rect>
           <path d="M4 11h16"></path>
@@ -41,31 +40,31 @@
           <circle cx="16" cy="15" r="1"></circle>
         </svg>
         <div class="brand-title">
-          <span>MetroSetu // મેટ્રો સેતુ</span>
-          <span class="brand-tag">Grievance Triage &amp; Ops</span>
+          <span>MetroSetu</span>
+          <span class="brand-gujarati">મેટ્રો સેતુ</span>
         </div>
-      </div>
+      </a>
     </div>
 
     <!-- Navigation Links (Desktop + Mobile Slide-out Drawer) -->
     <nav class="nav-menu" id="nav-menu">
       <ul class="nav-links">
-        <li data-role="public"><a href="#passenger" class="nav-link" data-view="passenger">📢 Passenger Helpdesk</a></li>
+        <li data-role="public"><a href="#passenger" class="nav-link" data-view="passenger">Helpdesk</a></li>
         <li data-role="staff"><a href="#dashboard" class="nav-link active" data-view="dashboard">Dashboard</a></li>
-        <li data-role="staff"><a href="#triage" class="nav-link nav-highlight" data-view="triage">⚡ Grievance Triage</a></li>
-        <li data-role="public"><a href="#stations" class="nav-link" data-view="stations">🚇 Stations</a></li>
-        <li data-role="admin"><a href="#station-form" class="nav-link" data-view="station-form">+ Add Station</a></li>
-        <li data-role="staff"><a href="#alerts" class="nav-link" data-view="alerts">Alerts &amp; AI</a></li>
-        <li data-role="admin"><a href="#staff" class="nav-link" data-view="staff">👥 Manage Staff</a></li>
+        <li data-role="staff"><a href="#triage" class="nav-link nav-highlight" data-view="triage">Triage</a></li>
+        <li data-role="public"><a href="#stations" class="nav-link" data-view="stations">Stations</a></li>
+        <li data-role="admin"><a href="#station-form" class="nav-link" data-view="station-form">+ Station</a></li>
+        <li data-role="staff"><a href="#alerts" class="nav-link" data-view="alerts">Alerts</a></li>
+        <li data-role="admin"><a href="#staff" class="nav-link" data-view="staff">Staff</a></li>
       </ul>
     </nav>
     <div id="nav-backdrop" class="nav-backdrop"></div>
 
-    <!-- Header Actions, Quick Passenger Report, Official Auth & Theme Controls -->
+    <!-- Compact Header Actions -->
     <div class="header-actions">
       <!-- Quick Button for Normal Users (No Login Required) -->
       <button id="btn-quick-report-problem" class="btn btn-primary btn-sm btn-quick-report" title="Report a Metro Problem (No Sign-In Needed)">
-        <span>🚨 Report Problem</span>
+        <span>🚨 Report</span>
       </button>
 
       <!-- Database Engine Status Pill -->
@@ -74,44 +73,43 @@
         <span id="db-engine-text">SQLite</span>
       </div>
 
-      <!-- Two-Way Connectivity Sync Action -->
-      <button id="btn-manual-sync" class="btn-sync" title="Sync local queued actions with central database">
-        <svg class="sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-        </svg>
-        <span class="sync-label">Sync</span>
-        <span id="sync-pending-badge" class="sync-counter-badge" style="display: none;">0</span>
-      </button>
-
       <!-- Live Online / Offline Status Badge -->
       <div id="status-badge" class="status-pill online" title="Heartbeat status to localhost backend">
         <span class="status-dot"></span>
         <span id="status-text">ONLINE</span>
       </div>
 
+      <!-- Two-Way Connectivity Sync Action (Compact Icon Button) -->
+      <button id="btn-manual-sync" class="btn-sync" title="Sync local queued actions with central database">
+        <svg class="sync-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span id="sync-pending-badge" class="sync-counter-badge" style="display: none;">0</span>
+      </button>
+
+      <!-- Quick Re-seed Button (Admin Only - Compact Icon Button) -->
+      <button id="btn-quick-seed" data-role="admin" class="btn-sync btn-seed-header" title="Re-populate realistic metro data (Admin Only)">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+
       <!-- Dark / Light Theme Toggle -->
       <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light / Dark Mode" aria-label="Toggle theme">
         <span id="theme-toggle-icon">🌙</span>
       </button>
 
-      <!-- Quick Re-seed Button (Admin Only) -->
-      <button id="btn-quick-seed" data-role="admin" class="btn btn-outline btn-sm btn-seed-header" title="Re-populate realistic metro data (Admin Only)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
-        </svg>
-        <span class="seed-label">Re-seed</span>
-      </button>
-
       <!-- Government Official Login Button (Visible when in Public Passenger Mode) -->
       <button id="btn-official-login" class="btn btn-outline btn-sm official-login-btn" title="Sign in for GMRC Staff & Admin Operations">
-        <span>🏛️ Official Login</span>
+        <span>🏛️ Login</span>
       </button>
 
       <!-- Signed-In Official Profile Badge & Logout (Visible when signed in as Staff/Admin) -->
       <div id="official-user-pill" class="official-user-pill" style="display: none;">
         <span id="official-role-badge" class="badge badge-p2">STAFF</span>
         <span id="official-user-name" class="official-name-text">Official</span>
-        <button id="btn-official-logout" class="btn-logout-icon" title="Sign out to Public Passenger Mode">Logout</button>
+        <button id="btn-official-logout" class="btn-logout-icon" title="Sign out to Public Passenger Mode">Exit</button>
       </div>
     </div>
   </header>
