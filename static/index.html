@@ -50,17 +50,24 @@
     <!-- Navigation Links (Desktop + Mobile Slide-out Drawer) -->
     <nav class="nav-menu" id="nav-menu">
       <ul class="nav-links">
-        <li><a href="#dashboard" class="nav-link active" data-view="dashboard">Dashboard</a></li>
-        <li><a href="#triage" class="nav-link nav-highlight" data-view="triage">📢 Grievance Triage</a></li>
-        <li><a href="#stations" class="nav-link" data-view="stations">Stations</a></li>
-        <li><a href="#station-form" class="nav-link" data-view="station-form">+ Add Station</a></li>
-        <li><a href="#alerts" class="nav-link" data-view="alerts">Alerts &amp; AI</a></li>
+        <li data-role="public"><a href="#passenger" class="nav-link" data-view="passenger">📢 Passenger Helpdesk</a></li>
+        <li data-role="staff"><a href="#dashboard" class="nav-link active" data-view="dashboard">Dashboard</a></li>
+        <li data-role="staff"><a href="#triage" class="nav-link nav-highlight" data-view="triage">⚡ Grievance Triage</a></li>
+        <li data-role="public"><a href="#stations" class="nav-link" data-view="stations">🚇 Stations</a></li>
+        <li data-role="admin"><a href="#station-form" class="nav-link" data-view="station-form">+ Add Station</a></li>
+        <li data-role="staff"><a href="#alerts" class="nav-link" data-view="alerts">Alerts &amp; AI</a></li>
+        <li data-role="admin"><a href="#staff" class="nav-link" data-view="staff">👥 Manage Staff</a></li>
       </ul>
     </nav>
     <div id="nav-backdrop" class="nav-backdrop"></div>
 
-    <!-- Header Actions, Connectivity Sync & Theme Controls -->
+    <!-- Header Actions, Quick Passenger Report, Official Auth & Theme Controls -->
     <div class="header-actions">
+      <!-- Quick Button for Normal Users (No Login Required) -->
+      <button id="btn-quick-report-problem" class="btn btn-primary btn-sm btn-quick-report" title="Report a Metro Problem (No Sign-In Needed)">
+        <span>🚨 Report Problem</span>
+      </button>
+
       <!-- Database Engine Status Pill -->
       <div id="db-engine-badge" class="engine-pill" title="Persistence Engine (UltSQL or SQLite fallback)">
         <span class="engine-dot"></span>
@@ -87,13 +94,25 @@
         <span id="theme-toggle-icon">🌙</span>
       </button>
 
-      <!-- Quick Re-seed Button -->
-      <button id="btn-quick-seed" class="btn btn-outline btn-sm btn-seed-header" title="Re-populate realistic metro data">
+      <!-- Quick Re-seed Button (Admin Only) -->
+      <button id="btn-quick-seed" data-role="admin" class="btn btn-outline btn-sm btn-seed-header" title="Re-populate realistic metro data (Admin Only)">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
         </svg>
         <span class="seed-label">Re-seed</span>
       </button>
+
+      <!-- Government Official Login Button (Visible when in Public Passenger Mode) -->
+      <button id="btn-official-login" class="btn btn-outline btn-sm official-login-btn" title="Sign in for GMRC Staff & Admin Operations">
+        <span>🏛️ Official Login</span>
+      </button>
+
+      <!-- Signed-In Official Profile Badge & Logout (Visible when signed in as Staff/Admin) -->
+      <div id="official-user-pill" class="official-user-pill" style="display: none;">
+        <span id="official-role-badge" class="badge badge-p2">STAFF</span>
+        <span id="official-user-name" class="official-name-text">Official</span>
+        <button id="btn-official-logout" class="btn-logout-icon" title="Sign out to Public Passenger Mode">Logout</button>
+      </div>
     </div>
   </header>
 
@@ -533,9 +552,9 @@
       <div class="section-header">
         <div>
           <h1 class="section-title">Metro Stations Directory</h1>
-          <p class="section-desc">Manage, search, and monitor all stations across the transit network.</p>
+          <p class="section-desc">Live station operational status, accessibility &amp; feeder bus connections across Gujarat Metro.</p>
         </div>
-        <a href="#station-form" class="btn btn-primary">
+        <a href="#station-form" id="btn-add-station-dir" data-role="admin" class="btn btn-primary">
           + Add New Station
         </a>
       </div>
@@ -626,8 +645,8 @@
         </div>
 
         <div style="display: flex; gap: 0.5rem;">
-          <button id="btn-edit-current-station" class="btn btn-secondary">Edit Station</button>
-          <button id="btn-add-station-fault" class="btn btn-outline">+ Log Fault</button>
+          <button id="btn-edit-current-station" data-role="admin" class="btn btn-secondary">Edit Station</button>
+          <button id="btn-add-station-fault" data-role="staff" class="btn btn-outline">+ Log Fault</button>
         </div>
 
         <!-- Quick Stats Strip -->
@@ -906,10 +925,244 @@
       </div>
     </section>
 
+    <!-- --------------------------------------------------------------------
+         VIEW 6: PUBLIC PASSENGER HELPDESK (#passenger — Zero Sign-In Required)
+         -------------------------------------------------------------------- -->
+    <section id="view-passenger" class="page-view">
+      <!-- Public Hero Banner -->
+      <div class="passenger-hero-card">
+        <div class="passenger-hero-content">
+          <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.5rem;">
+            <span class="badge badge-operational">👤 PUBLIC COMMUTER PORTAL (NO LOGIN NEEDED)</span>
+            <span class="badge badge-info">ગુજરાતી • हिन्दी • Gujlish • English</span>
+          </div>
+          <h1 class="section-title" style="font-size: 1.65rem; margin-bottom: 0.35rem;">
+            Gujarat Metro Passenger Helpdesk // મુસાફર સહાયતા કેન્દ્ર
+          </h1>
+          <p class="section-desc" style="font-size: 0.92rem; max-width: 720px;">
+            Report any station or train issue in your own language—even inside underground tunnels with zero internet. Our on-device AI immediately prioritizes emergencies and alerts the nearest Station Controller.
+          </p>
+        </div>
+        <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+          <button type="button" class="btn btn-primary" onclick="document.getElementById('p-raw-text')?.focus()">
+            🚨 Report a Problem Now
+          </button>
+          <a href="#stations" class="btn btn-outline">
+            🚇 Check Live Station Status
+          </a>
+        </div>
+      </div>
+
+      <div class="dash-ops-grid">
+        <!-- Left: Quick Passenger Problem Report Form -->
+        <div class="dash-hub-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="pulse-indicator"></span>
+              <strong style="font-size: 1.05rem;">📢 Submit a Metro Problem / Grievance</strong>
+            </div>
+            <span class="badge badge-info">Instant Ticket ID</span>
+          </div>
+
+          <!-- 1-Click Quick Problem Buttons for Normal Commuters -->
+          <div>
+            <div style="font-size: 0.76rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.4rem;">
+              ⚡ Quick 1-Tap Issue Templates (Tap to autofill):
+            </div>
+            <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
+              <button type="button" class="template-chip" onclick="fillPassengerQuickIssue('મોટેરા સ્ટેડિયમ પ્લેટફોર્મ ૧ પર લિફ્ટ બંધ છે અને વડીલો અટવાયા છે!')">🛗 ગુજરાતી: Lift Stuck</button>
+              <button type="button" class="template-chip" onclick="fillPassengerQuickIssue('Kalupur station platform 2 par water leakage chhe, slip thavay evu chhe')">⚠️ Gujlish: Water Leak</button>
+              <button type="button" class="template-chip" onclick="fillPassengerQuickIssue('TVM मशीन में यूपीआई से ₹100 कट गए पर टिकट नहीं निकला')">🎫 हिन्दी: UPI / Ticket Stuck</button>
+              <button type="button" class="template-chip" onclick="fillPassengerQuickIssue('Washroom near Gate 1 is very dirty and water tap is broken')">🧹 English: Restroom Cleanliness</button>
+            </div>
+          </div>
+
+          <form id="passenger-portal-form" style="display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.25rem;">
+            <div class="form-grid" style="margin-bottom: 0;">
+              <div class="form-group">
+                <label class="form-label" for="p-passenger-name">Your Name / Mobile (Optional)</label>
+                <input type="text" id="p-passenger-name" class="form-control" placeholder="e.g. Aarav Patel" value="Commuter">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="p-station-id">Select Metro Station *</label>
+                <select id="p-station-id" class="form-control" required>
+                  <!-- Populated dynamically by app.js -->
+                </select>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="p-raw-text">Describe the Problem * (Write in Gujarati, Hindi, Gujlish, or English)</label>
+              <textarea id="p-raw-text" class="form-control" rows="3" placeholder="Type your problem here... e.g., 'Lift bandh che Kalupur par' or 'લિફ્ટ બંધ છે'..." required></textarea>
+            </div>
+
+            <div class="ai-live-preview-box" style="margin-top: 0;">
+              <div class="ai-live-header">
+                <span class="status-dot"></span>
+                <strong>Live On-Device AI Routing Preview:</strong>
+              </div>
+              <div class="ai-live-chips">
+                <span>Detected Language: <strong id="p-prev-lang" class="badge lang-english">English</strong></span>
+                <span>Assigned Dept: <strong id="p-prev-dept" class="badge badge-info">Safety</strong></span>
+                <span>Priority Level: <strong id="p-prev-urg" class="badge badge-p3">P3 Medium</strong></span>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.7rem; font-size: 0.95rem;">
+              🚨 Submit Problem &amp; Get Instant Ticket
+            </button>
+          </form>
+
+          <!-- Instant Confirmation Receipt Box (Shown after submission) -->
+          <div id="passenger-ticket-receipt" class="ticket-receipt-card" style="display: none;">
+            <!-- Populated dynamically on submit -->
+          </div>
+        </div>
+
+        <!-- Right: Track Recent Commuter Tickets & Live Helpdesk Status -->
+        <div class="dash-hub-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <strong style="font-size: 1.05rem;">🎫 Recent Commuter Reports &amp; Live Resolution Tracker</strong>
+              <div style="font-size: 0.78rem; color: var(--text-muted);">Track live status &amp; official station responses</div>
+            </div>
+            <span class="badge badge-operational" id="passenger-recent-count">Live Feed</span>
+          </div>
+
+          <div class="search-input-wrap" style="margin-bottom: 0.25rem;">
+            <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="passenger-ticket-search" class="search-input" placeholder="Search by Ticket ID (#MS-...), your name, or station...">
+          </div>
+
+          <div id="passenger-tickets-list" class="dash-urgent-list" style="max-height: 430px; overflow-y: auto; padding-right: 0.25rem;">
+            <!-- Dynamically populated by app.js -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------------------------
+         VIEW 7: ADMIN STAFF ACCOUNT MANAGEMENT (#staff — Admin Only)
+         -------------------------------------------------------------------- -->
+    <section id="view-staff" class="page-view">
+      <div class="section-header">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+            <h1 class="section-title">GMRC Government Staff &amp; Access Management</h1>
+            <span class="badge badge-p1">🛡️ ADMIN ONLY</span>
+          </div>
+          <p class="section-desc">
+            Provision new Government / GMRC official accounts, assign station controllers to departments, and manage role permissions.
+          </p>
+        </div>
+        <div class="header-actions">
+          <a href="#station-form" class="btn btn-outline btn-sm">+ Add New Station</a>
+          <a href="#triage" class="btn btn-primary btn-sm">Open Triage Console &rarr;</a>
+        </div>
+      </div>
+
+      <div class="dash-ops-grid">
+        <!-- Left: Add New Staff / Official Account Form -->
+        <div class="dash-hub-card">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <strong style="font-size: 1.05rem;">👤 + Add New Government Staff Account</strong>
+            <span class="badge badge-info">SQLite / UltSQL Synced</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            Create login credentials for Station Controllers, Safety Officers, Mechanical Engineers, or Co-Admins.
+          </p>
+
+          <form id="staff-create-form" style="display: flex; flex-direction: column; gap: 0.85rem;">
+            <div class="form-grid" style="margin-bottom: 0;">
+              <div class="form-group">
+                <label class="form-label" for="staff-full-name">Official Full Name *</label>
+                <input type="text" id="staff-full-name" class="form-control" placeholder="e.g. Bhavesh Solanki" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-username">Login Username *</label>
+                <input type="text" id="staff-username" class="form-control" placeholder="e.g. kalupur_ctrl" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-password">Login Password *</label>
+                <input type="text" id="staff-password" class="form-control" value="metro123" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-role">Access Role *</label>
+                <select id="staff-role" class="form-control" required>
+                  <option value="staff">👮 Government Staff / Station Controller</option>
+                  <option value="admin">🛡️ Chief Operations Admin (Full Access)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-department">Assigned Department Queue</label>
+                <select id="staff-department" class="form-control">
+                  <option value="All">All Departments (Station Master)</option>
+                  <option value="Safety">🚨 Safety &amp; Security</option>
+                  <option value="Lifts & Escalators">🛗 Lifts &amp; Escalators</option>
+                  <option value="Cleanliness">🧹 Cleanliness &amp; Sanitation</option>
+                  <option value="Fare & Ticketing">🎫 Fare &amp; Ticketing</option>
+                  <option value="Staff Behaviour">👤 Staff Behaviour</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="staff-designation">Official Designation</label>
+                <input type="text" id="staff-designation" class="form-control" value="Station Controller" placeholder="e.g. Senior Station Controller">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="staff-station">Assigned Metro Station</label>
+              <select id="staff-station" class="form-control">
+                <option value="All Stations">All Gujarat Metro Stations</option>
+                <option value="Motera Stadium">Motera Stadium (MET-01)</option>
+                <option value="Kalupur Railway Station">Kalupur Railway Station (MET-02)</option>
+                <option value="APMC">APMC (MET-03)</option>
+                <option value="Gandhinagar Capital">Gandhinagar Capital (MET-04)</option>
+                <option value="Old High Court Interchange">Old High Court Interchange (MET-05)</option>
+                <option value="Thaltej">Thaltej (MET-06)</option>
+                <option value="Sabarmati">Sabarmati (MET-09)</option>
+              </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.65rem;">
+              ✓ Create Official Staff Account
+            </button>
+          </form>
+        </div>
+
+        <!-- Right: Active Government Staff Directory Table -->
+        <div class="dash-hub-card">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <strong style="font-size: 1.05rem;">🏛️ Registered GMRC Officials &amp; Staff</strong>
+            <span class="badge badge-operational" id="staff-count-badge">4 Active</span>
+          </div>
+          <div class="data-table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name &amp; Designation</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Dept / Station</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="staff-directory-tbody">
+                <!-- Populated dynamically by app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- ========================================================================
-       MODAL: LOG NEW PASSENGER GRIEVANCE
+       MODAL: LOG NEW PASSENGER GRIEVANCE (Accessible to Normal Users & Staff)
        ======================================================================== -->
   <div id="modal-new-grievance" class="modal-backdrop" style="display: none;">
     <div class="modal-card">
@@ -918,9 +1171,22 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-cyan);">
             <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
           </svg>
-          <h2 class="modal-title">Log Passenger Grievance</h2>
+          <h2 class="modal-title">🚨 Report a Metro Problem (No Sign-In Needed)</h2>
         </div>
         <button id="btn-close-modal-grievance" class="modal-close-btn">&times;</button>
+      </div>
+
+      <!-- 1-Click Quick Problem Templates inside Modal -->
+      <div style="margin-bottom: 0.85rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 0.35rem;">
+          ⚡ Quick 1-Tap Problem Templates:
+        </div>
+        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <button type="button" class="template-chip" onclick="fillModalQuickIssue('મોટેરા સ્ટેડિયમ પ્લેટફોર્મ ૧ પર લિફ્ટ બંધ છે અને વડીલો અટવાયા છે!')">🛗 ગુજરાતી: Lift Stuck</button>
+          <button type="button" class="template-chip" onclick="fillModalQuickIssue('Kalupur station platform 2 par water leakage chhe, slip thavay evu chhe')">⚠️ Gujlish: Water Leak</button>
+          <button type="button" class="template-chip" onclick="fillModalQuickIssue('TVM मशीन में ₹100 कट गए पर टिकट नहीं निकला')">🎫 हिन्दी: TVM Refund</button>
+          <button type="button" class="template-chip" onclick="fillModalQuickIssue('Emergency SOS button near escalator is unresponsive')">🚨 English: SOS Button</button>
+        </div>
       </div>
 
       <form id="grievance-form">
@@ -933,9 +1199,9 @@
           <div class="form-group">
             <label class="form-label" for="g-channel">Intake Channel</label>
             <select id="g-channel" class="form-control">
+              <option value="QR Portal">On-Train QR Grievance Portal</option>
               <option value="WhatsApp">WhatsApp Bot (+91 98250 XXXXX)</option>
               <option value="Station Kiosk">Station Helpdesk Kiosk</option>
-              <option value="QR Portal">On-Train QR Grievance Portal</option>
               <option value="Metro Helpline">Helpline IVR (1800-METRO)</option>
               <option value="Twitter/X">Twitter/X (@GujaratMetro)</option>
             </select>
@@ -982,6 +1248,56 @@
         <div class="modal-actions">
           <button type="button" id="btn-cancel-modal-grievance" class="btn btn-secondary">Cancel</button>
           <button type="submit" class="btn btn-primary" id="btn-save-grievance">⚡ Submit &amp; Run Triage</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL: GOVERNMENT / GMRC OFFICIAL LOGIN
+       ======================================================================== -->
+  <div id="modal-official-login" class="modal-backdrop" style="display: none;">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 1.25rem;">🏛️</span>
+          <h2 class="modal-title">GMRC Government Official Sign-In</h2>
+        </div>
+        <button id="btn-close-modal-login" class="modal-close-btn">&times;</button>
+      </div>
+
+      <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.9rem;">
+        Normal commuters do <strong>not</strong> need to sign in to report problems. Sign in below only if you are a <strong>GMRC Station Controller / Staff</strong> or <strong>Chief Admin</strong>.
+      </p>
+
+      <!-- 1-Click Judge Demo Role Fill Buttons -->
+      <div class="demo-login-box">
+        <div style="font-size: 0.75rem; font-weight: 700; color: var(--accent-orange); margin-bottom: 0.45rem;">
+          ⚡ Hackathon Judge 1-Click Quick Sign-In:
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <button type="button" class="btn btn-primary btn-sm" style="flex: 1;" onclick="quickDemoLogin('admin', 'admin123')">
+            🛡️ Login as Chief Admin
+          </button>
+          <button type="button" class="btn btn-secondary btn-sm" style="flex: 1;" onclick="quickDemoLogin('controller', 'metro123')">
+            👮 Login as Station Staff
+          </button>
+        </div>
+      </div>
+
+      <form id="official-login-form" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.85rem;">
+        <div class="form-group">
+          <label class="form-label" for="login-username">Official Username *</label>
+          <input type="text" id="login-username" class="form-control" placeholder="admin or controller" value="admin" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="login-password">Password *</label>
+          <input type="password" id="login-password" class="form-control" placeholder="••••••••" value="admin123" required>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 0.5rem;">
+          <button type="button" id="btn-cancel-modal-login" class="btn btn-secondary">Stay as Passenger</button>
+          <button type="submit" class="btn btn-primary">🔐 Sign In to Operations</button>
         </div>
       </form>
     </div>

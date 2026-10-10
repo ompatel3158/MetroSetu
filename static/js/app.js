@@ -16,7 +16,10 @@
 
 const state = {
   isOnline: true,
-  currentView: "dashboard",
+  currentView: "passenger",
+  currentUser: JSON.parse(localStorage.getItem("metrosetu_official_user") || "null"),
+  pendingRouteAfterLogin: null,
+  staffList: JSON.parse(localStorage.getItem("metrosetu_cached_staff") || "[]"),
   selectedStationId: null,
   stations: [],
   kpis: null,
@@ -27,6 +30,7 @@ const state = {
   activeUrgency: "",
   activeStatus: "",
   triageSearch: "",
+  passengerSearch: "",
   offlineQueue: JSON.parse(localStorage.getItem("metrosetu_offline_queue") || "[]"),
   charts: {
     ridershipTrend: null,
@@ -242,13 +246,87 @@ function destroyChart(chartKey) {
 }
 
 // ============================================================================
-// 3. CLIENT-SIDE ROUTER
+// 3. ROLE-BASED ACCESS CONTROL & CLIENT-SIDE ROUTER
 // ============================================================================
 
+function isStaffOrAdmin() {
+  return Boolean(state.currentUser && (state.currentUser.role === "staff" || state.currentUser.role === "admin"));
+}
+
+function isAdmin() {
+  return Boolean(state.currentUser && state.currentUser.role === "admin");
+}
+
+function applyRoleVisibility() {
+  const staffOk = isStaffOrAdmin();
+  const adminOk = isAdmin();
+
+  document.querySelectorAll("[data-role]").forEach((el) => {
+    const reqRole = el.getAttribute("data-role");
+    if (reqRole === "public") {
+      el.style.display = "";
+    } else if (reqRole === "staff") {
+      el.style.display = staffOk ? "" : "none";
+    } else if (reqRole === "admin") {
+      el.style.display = adminOk ? "" : "none";
+    }
+  });
+
+  const btnLogin = document.getElementById("btn-official-login");
+  const userPill = document.getElementById("official-user-pill");
+  const roleBadge = document.getElementById("official-role-badge");
+  const userNameEl = document.getElementById("official-user-name");
+
+  if (staffOk && state.currentUser) {
+    if (btnLogin) btnLogin.style.display = "none";
+    if (userPill) userPill.style.display = "inline-flex";
+    if (roleBadge) {
+      roleBadge.textContent = adminOk ? "🛡️ ADMIN" : "👮 STAFF";
+      roleBadge.className = adminOk ? "badge badge-p1" : "badge badge-p2";
+    }
+    if (userNameEl) {
+      userNameEl.textContent = state.currentUser.full_name || state.currentUser.username;
+      userNameEl.title = `${state.currentUser.designation || "Official"} (${state.currentUser.assigned_station || "All Stations"})`;
+    }
+  } else {
+    if (btnLogin) btnLogin.style.display = "inline-flex";
+    if (userPill) userPill.style.display = "none";
+  }
+}
+
 function handleRouting() {
-  const hash = window.location.hash || "#dashboard";
+  applyRoleVisibility();
+
+  const defaultRoute = isStaffOrAdmin() ? "#dashboard" : "#passenger";
+  const hash = window.location.hash || defaultRoute;
   const [route, queryString] = hash.split("?");
   const params = new URLSearchParams(queryString || "");
+
+  // Enforce Role Separation: Normal users can access #passenger, #stations, #station-detail without login
+  const staffRoutes = ["#dashboard", "#triage", "#alerts"];
+  const adminRoutes = ["#station-form", "#staff"];
+
+  if (adminRoutes.includes(route) && !isAdmin()) {
+    state.pendingRouteAfterLogin = hash;
+    openOfficialLoginModal();
+    showToast("🛡️ Chief Admin Sign-In required to manage stations or staff accounts.", "warning");
+    const fallbackView = isStaffOrAdmin() ? "view-dashboard" : "view-passenger";
+    document.querySelectorAll(".page-view").forEach((v) => v.classList.remove("active"));
+    document.getElementById(fallbackView)?.classList.add("active");
+    if (isStaffOrAdmin()) loadDashboardView();
+    else loadPassengerView();
+    return;
+  }
+
+  if (staffRoutes.includes(route) && !isStaffOrAdmin()) {
+    state.pendingRouteAfterLogin = hash;
+    openOfficialLoginModal();
+    showToast("🏛️ GMRC Official Sign-In required for internal operations (1-click demo login available).", "info");
+    document.querySelectorAll(".page-view").forEach((v) => v.classList.remove("active"));
+    document.getElementById("view-passenger")?.classList.add("active");
+    loadPassengerView();
+    return;
+  }
 
   // Update nav links active styling
   document.querySelectorAll(".nav-link").forEach((link) => {
@@ -263,7 +341,15 @@ function handleRouting() {
     view.classList.remove("active");
   });
 
-  if (route === "#triage") {
+  if (route === "#passenger") {
+    state.currentView = "passenger";
+    document.getElementById("view-passenger")?.classList.add("active");
+    loadPassengerView();
+  } else if (route === "#staff") {
+    state.currentView = "staff";
+    document.getElementById("view-staff")?.classList.add("active");
+    loadStaffAdminView();
+  } else if (route === "#triage") {
     state.currentView = "triage";
     document.getElementById("view-triage").classList.add("active");
     loadTriageView();
@@ -290,7 +376,6 @@ function handleRouting() {
     document.getElementById("view-alerts").classList.add("active");
     loadAlertsView();
   } else {
-    // Default: Dashboard
     state.currentView = "dashboard";
     document.getElementById("view-dashboard").classList.add("active");
     loadDashboardView();
@@ -2004,8 +2089,10 @@ function renderStationsTable(stations) {
         <td>
           <div style="display: flex; gap: 0.35rem;">
             <a href="#station-detail?id=${s.id}" class="btn btn-outline btn-sm">Details</a>
-            <a href="#station-form?id=${s.id}" class="btn btn-secondary btn-sm">Edit</a>
-            <button class="btn btn-danger btn-sm" onclick="handleDeleteStation(${s.id}, '${s.name}')">Del</button>
+            ${isAdmin() ? `
+              <a href="#station-form?id=${s.id}" class="btn btn-secondary btn-sm">Edit</a>
+              <button class="btn btn-danger btn-sm" onclick="handleDeleteStation(${s.id}, '${s.name}')">Del</button>
+            ` : ""}
           </div>
         </td>
       </tr>
@@ -2665,9 +2752,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Modal: New Grievance
+  // Modal: New Grievance & Quick Report Problem Button (Normal Users + Staff)
   const btnOpenGrievance = document.getElementById("btn-open-new-grievance");
   if (btnOpenGrievance) btnOpenGrievance.addEventListener("click", openNewGrievanceModal);
+
+  const btnQuickReport = document.getElementById("btn-quick-report-problem");
+  if (btnQuickReport) btnQuickReport.addEventListener("click", openNewGrievanceModal);
 
   const btnCloseGrievance = document.getElementById("btn-close-modal-grievance");
   if (btnCloseGrievance) btnCloseGrievance.addEventListener("click", closeNewGrievanceModal);
@@ -2697,4 +2787,491 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Passenger Portal Form & Live Triage Preview
+  const passengerForm = document.getElementById("passenger-portal-form");
+  if (passengerForm) passengerForm.addEventListener("submit", handlePassengerFormSubmit);
+
+  const pRawText = document.getElementById("p-raw-text");
+  if (pRawText) {
+    pRawText.addEventListener("input", (e) => {
+      const preview = triageTextClientSide(e.target.value);
+      const elLang = document.getElementById("p-prev-lang");
+      if (elLang) {
+        elLang.textContent = preview.language;
+        elLang.className = "badge " + getLanguagePillClass(preview.language);
+      }
+      const elDept = document.getElementById("p-prev-dept");
+      if (elDept) elDept.textContent = preview.department;
+      const elUrg = document.getElementById("p-prev-urg");
+      if (elUrg) {
+        elUrg.textContent = preview.urgency;
+        elUrg.className = "badge " + getUrgencyBadgeClass(preview.urgency, preview.score);
+      }
+    });
+  }
+
+  const pSearch = document.getElementById("passenger-ticket-search");
+  if (pSearch) {
+    pSearch.addEventListener("input", (e) => {
+      state.passengerSearch = e.target.value;
+      renderPassengerTicketsList();
+    });
+  }
+
+  // Official Login / Logout & Staff Admin Form
+  const btnOfficialLogin = document.getElementById("btn-official-login");
+  if (btnOfficialLogin) btnOfficialLogin.addEventListener("click", openOfficialLoginModal);
+
+  const btnCloseLogin = document.getElementById("btn-close-modal-login");
+  if (btnCloseLogin) btnCloseLogin.addEventListener("click", closeOfficialLoginModal);
+
+  const btnCancelLogin = document.getElementById("btn-cancel-modal-login");
+  if (btnCancelLogin) btnCancelLogin.addEventListener("click", closeOfficialLoginModal);
+
+  const loginForm = document.getElementById("official-login-form");
+  if (loginForm) loginForm.addEventListener("submit", handleOfficialLoginSubmit);
+
+  const btnOfficialLogout = document.getElementById("btn-official-logout");
+  if (btnOfficialLogout) btnOfficialLogout.addEventListener("click", handleOfficialLogout);
+
+  const staffCreateForm = document.getElementById("staff-create-form");
+  if (staffCreateForm) staffCreateForm.addEventListener("submit", handleCreateStaffSubmit);
 });
+
+// ============================================================================
+// 11. PUBLIC PASSENGER HELPDESK (NO SIGN-IN REQUIRED)
+// ============================================================================
+
+async function loadPassengerView() {
+  // Populate station dropdown in Passenger Portal
+  if (!state.stations || state.stations.length === 0) {
+    try {
+      const res = await fetch("/api/stations");
+      if (res.ok) state.stations = await res.json();
+    } catch (e) {
+      // Fallback stations
+    }
+  }
+  const pSelect = document.getElementById("p-station-id");
+  if (pSelect) {
+    const stList = (state.stations && state.stations.length > 0) ? state.stations : [
+      { id: 1, name: "Motera Stadium", code: "MET-01" },
+      { id: 2, name: "Kalupur Railway Station", code: "MET-02" },
+      { id: 3, name: "APMC", code: "MET-03" },
+      { id: 4, name: "Gandhinagar Capital", code: "MET-04" },
+      { id: 5, name: "Old High Court Interchange", code: "MET-05" },
+      { id: 6, name: "Thaltej", code: "MET-06" }
+    ];
+    pSelect.innerHTML = stList.map((s) => `<option value="${s.id}">${s.name} (${s.code || ''})</option>`).join("");
+  }
+
+  // Load recent complaints for commuter tracking
+  try {
+    const res = await fetch("/api/complaints?limit=50");
+    if (res.ok) {
+      const list = await res.json();
+      state.complaints = list.map((c, idx) => ({
+        ...c,
+        ticket_number: c.ticket_number || `MS-${1001 + (c.id || idx)}`
+      }));
+      localStorage.setItem("metrosetu_cached_complaints", JSON.stringify(state.complaints));
+    }
+  } catch (e) {
+    const cached = localStorage.getItem("metrosetu_cached_complaints");
+    if (cached) {
+      try { state.complaints = JSON.parse(cached); } catch (_) {}
+    }
+  }
+
+  renderPassengerTicketsList();
+}
+
+function fillPassengerQuickIssue(sampleText) {
+  const input = document.getElementById("p-raw-text");
+  if (!input) return;
+  input.value = sampleText;
+  input.dispatchEvent(new Event("input"));
+  input.focus();
+}
+
+function fillModalQuickIssue(sampleText) {
+  const input = document.getElementById("g-raw-text");
+  if (!input) return;
+  input.value = sampleText;
+  input.dispatchEvent(new Event("input"));
+  input.focus();
+}
+
+async function handlePassengerFormSubmit(e) {
+  e.preventDefault();
+  const nameEl = document.getElementById("p-passenger-name");
+  const stEl = document.getElementById("p-station-id");
+  const textEl = document.getElementById("p-raw-text");
+
+  const rawText = textEl ? textEl.value.trim() : "";
+  if (!rawText) {
+    showToast("Please describe the problem", "error");
+    return;
+  }
+
+  const pName = (nameEl && nameEl.value.trim()) ? nameEl.value.trim() : "Commuter";
+  const stId = stEl ? Number(stEl.value) : 1;
+  const stObj = (state.stations || []).find((s) => s.id === stId);
+  const stName = stObj ? stObj.name : "Gujarat Metro Station";
+
+  const analysis = triageTextClientSide(rawText);
+  const ticketNum = `MS-${Math.floor(1000 + Math.random() * 9000)}`;
+  const autoReply = generateDefaultDraft({ detected_language: analysis.language, ticket_number: ticketNum });
+
+  let createdComplaint = {
+    id: Date.now(),
+    ticket_number: ticketNum,
+    passenger_name: pName,
+    station_id: stId,
+    station_name: stName,
+    channel: "Passenger Portal",
+    raw_text: rawText,
+    detected_language: analysis.language,
+    department: analysis.department,
+    urgency_level: analysis.urgency,
+    urgency_score: analysis.score,
+    draft_reply: autoReply,
+    status: "Open",
+    reported_at: new Date().toISOString()
+  };
+
+  if (state.isOnline) {
+    try {
+      const res = await fetch("/api/complaints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          passenger_name: pName,
+          channel: "Passenger Portal",
+          raw_text: rawText,
+          station_id: stId
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.complaint) {
+          createdComplaint = {
+            ...data.complaint,
+            ticket_number: `MS-${1001 + (data.complaint.id || 100)}`
+          };
+        }
+        showToast(`✓ Problem reported! Ticket #${createdComplaint.ticket_number} assigned to ${createdComplaint.department}`, "success");
+      } else {
+        queueOfflineCreation(createdComplaint);
+      }
+    } catch (err) {
+      queueOfflineCreation(createdComplaint);
+    }
+  } else {
+    queueOfflineCreation(createdComplaint);
+  }
+
+  state.complaints.unshift(createdComplaint);
+  localStorage.setItem("metrosetu_cached_complaints", JSON.stringify(state.complaints));
+
+  if (textEl) textEl.value = "";
+
+  // Render Instant Receipt Card for Commuter
+  const receiptBox = document.getElementById("passenger-ticket-receipt");
+  if (receiptBox) {
+    receiptBox.style.display = "flex";
+    receiptBox.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <strong style="color: var(--status-green); font-size: 0.92rem;">✓ Grievance Registered: #${createdComplaint.ticket_number}</strong>
+        <span class="badge ${getUrgencyBadgeClass(createdComplaint.urgency_level, createdComplaint.urgency_score)}">${createdComplaint.urgency_level}</span>
+      </div>
+      <div style="font-size: 0.8rem; color: var(--text-main);">
+        Routed to <strong>${createdComplaint.department}</strong> at <strong>${createdComplaint.station_name || stName}</strong> (${createdComplaint.detected_language}).
+      </div>
+      <div style="font-size: 0.8rem; background: var(--bg-secondary); padding: 0.55rem 0.75rem; border-radius: 8px; border: 1px solid var(--border-subtle);">
+        <strong>Official Auto-Response:</strong> ${escapeHtml(createdComplaint.draft_reply || autoReply)}
+      </div>
+    `;
+  }
+
+  renderPassengerTicketsList();
+}
+
+function renderPassengerTicketsList() {
+  const container = document.getElementById("passenger-tickets-list");
+  if (!container) return;
+
+  const q = (state.passengerSearch || "").toLowerCase().trim();
+  const list = (state.complaints || []).filter((c) => {
+    if (!q) return true;
+    const tId = (c.ticket_number || `MS-${c.id}`).toLowerCase();
+    return (
+      tId.includes(q) ||
+      (c.passenger_name || "").toLowerCase().includes(q) ||
+      (c.station_name || "").toLowerCase().includes(q) ||
+      (c.raw_text || "").toLowerCase().includes(q)
+    );
+  }).slice(0, 12);
+
+  const countBadge = document.getElementById("passenger-recent-count");
+  if (countBadge) countBadge.textContent = `${list.length} Recent Tickets`;
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 1.5rem;">No matching tickets found.</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map((c) => {
+    const tId = c.ticket_number || `MS-${1001 + (c.id || 0)}`;
+    const statusClass = c.status === "Resolved" ? "badge-operational" : (c.status === "In Progress" ? "badge-warning" : "badge-p2");
+    return `
+      <div class="dash-urgent-item" style="cursor: default; border-left-color: ${c.status === 'Resolved' ? 'var(--status-green)' : 'var(--accent-orange)'};">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
+            <strong style="font-family: var(--font-mono); color: var(--accent-orange);">#${tId}</strong>
+            <span class="badge ${statusClass}">${c.status || "Open"}</span>
+            <span class="badge ${getLanguagePillClass(c.detected_language)}">${c.detected_language}</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">📍 ${c.station_name || "Station"} • ${c.department}</span>
+          </div>
+          <div style="font-size: 0.82rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.2rem;">
+            ${escapeHtml(c.raw_text)}
+          </div>
+          ${c.draft_reply ? `
+            <div style="font-size: 0.75rem; color: var(--text-muted); background: var(--bg-secondary); padding: 0.35rem 0.6rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              💬 <strong>GMRC Reply:</strong> ${escapeHtml(c.draft_reply)}
+            </div>
+          ` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ============================================================================
+// 12. GOVERNMENT OFFICIAL AUTHENTICATION & ADMIN STAFF MANAGEMENT
+// ============================================================================
+
+const DEFAULT_OFFLINE_STAFF = [
+  { id: 1, username: "admin", full_name: "Rajeshwar Rao, IAS", role: "admin", department: "Operations & Admin", designation: "GMRC Chief Operations Admin", assigned_station: "All Stations" },
+  { id: 2, username: "controller", full_name: "Krunal Prajapati", role: "staff", department: "All", designation: "Senior Station Controller", assigned_station: "Motera Stadium" },
+  { id: 3, username: "safety_officer", full_name: "Meera Jadeja", role: "staff", department: "Safety", designation: "Chief Safety & Security Officer", assigned_station: "Old High Court Interchange" },
+  { id: 4, username: "lifts_eng", full_name: "Suresh Mistri", role: "staff", department: "Lifts & Escalators", designation: "Lead Mechanical Engineer", assigned_station: "Kalupur Railway Station" }
+];
+
+function openOfficialLoginModal() {
+  const modal = document.getElementById("modal-official-login");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeOfficialLoginModal() {
+  const modal = document.getElementById("modal-official-login");
+  if (modal) modal.style.display = "none";
+}
+
+async function quickDemoLogin(username, password) {
+  const uEl = document.getElementById("login-username");
+  const pEl = document.getElementById("login-password");
+  if (uEl) uEl.value = username;
+  if (pEl) pEl.value = password;
+  await executeOfficialLogin(username, password);
+}
+
+async function handleOfficialLoginSubmit(e) {
+  e.preventDefault();
+  const uEl = document.getElementById("login-username");
+  const pEl = document.getElementById("login-password");
+  const username = uEl ? uEl.value.trim() : "";
+  const password = pEl ? pEl.value.trim() : "";
+  await executeOfficialLogin(username, password);
+}
+
+async function executeOfficialLogin(username, password) {
+  if (!username || !password) {
+    showToast("Please enter official username and password", "error");
+    return;
+  }
+
+  let authenticatedUser = null;
+
+  try {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      authenticatedUser = data.user;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || "Invalid GMRC credentials", "error");
+      return;
+    }
+  } catch (e) {
+    // 100% Offline Fallback Authentication for Tunnel Rides
+    const allStaff = (state.staffList && state.staffList.length > 0) ? state.staffList : DEFAULT_OFFLINE_STAFF;
+    const found = allStaff.find((s) => s.username.toLowerCase() === username.toLowerCase());
+    if (found && (password === "admin123" || password === "metro123" || password === found.password)) {
+      authenticatedUser = found;
+    } else {
+      showToast("Offline Auth: Invalid credentials (Try admin/admin123 or controller/metro123)", "error");
+      return;
+    }
+  }
+
+  if (authenticatedUser) {
+    state.currentUser = authenticatedUser;
+    localStorage.setItem("metrosetu_official_user", JSON.stringify(authenticatedUser));
+    closeOfficialLoginModal();
+    applyRoleVisibility();
+    showToast(`✓ Signed in as ${authenticatedUser.full_name} (${authenticatedUser.role.toUpperCase()})`, "success");
+
+    const targetHash = state.pendingRouteAfterLogin || (authenticatedUser.role === "admin" ? "#dashboard" : "#triage");
+    state.pendingRouteAfterLogin = null;
+    if (window.location.hash === targetHash) {
+      handleRouting();
+    } else {
+      window.location.hash = targetHash;
+    }
+  }
+}
+
+function handleOfficialLogout() {
+  state.currentUser = null;
+  localStorage.removeItem("metrosetu_official_user");
+  applyRoleVisibility();
+  showToast("Signed out to Public Passenger Mode", "info");
+  window.location.hash = "#passenger";
+}
+
+async function loadStaffAdminView() {
+  try {
+    const res = await fetch("/api/staff");
+    if (res.ok) {
+      state.staffList = await res.json();
+      localStorage.setItem("metrosetu_cached_staff", JSON.stringify(state.staffList));
+    }
+  } catch (e) {
+    if (!state.staffList || state.staffList.length === 0) {
+      state.staffList = DEFAULT_OFFLINE_STAFF;
+    }
+  }
+  renderStaffTable();
+}
+
+function renderStaffTable() {
+  const tbody = document.getElementById("staff-directory-tbody");
+  const badge = document.getElementById("staff-count-badge");
+  const list = (state.staffList && state.staffList.length > 0) ? state.staffList : DEFAULT_OFFLINE_STAFF;
+
+  if (badge) badge.textContent = `${list.length} Officials`;
+  if (!tbody) return;
+
+  tbody.innerHTML = list.map((u) => `
+    <tr>
+      <td>
+        <strong>${escapeHtml(u.full_name)}</strong>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">${escapeHtml(u.designation || "Station Controller")}</div>
+      </td>
+      <td><code>${escapeHtml(u.username)}</code></td>
+      <td>
+        <span class="badge ${u.role === 'admin' ? 'badge-p1' : 'badge-p2'}">
+          ${u.role === "admin" ? "🛡️ ADMIN" : "👮 STAFF"}
+        </span>
+      </td>
+      <td>
+        <div style="font-size: 0.8rem; font-weight: 600;">${escapeHtml(u.department || "All")}</div>
+        <div style="font-size: 0.74rem; color: var(--text-muted);">📍 ${escapeHtml(u.assigned_station || "All Stations")}</div>
+      </td>
+      <td>
+        ${u.username === "admin" ? `
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Primary Admin</span>
+        ` : `
+          <button type="button" class="btn btn-danger btn-sm" onclick="handleDeleteStaff(${u.id}, '${escapeHtml(u.username)}')">Remove</button>
+        `}
+      </td>
+    </tr>
+  `).join("");
+}
+
+async function handleCreateStaffSubmit(e) {
+  e.preventDefault();
+  if (!isAdmin()) {
+    showToast("Only Chief Admin can create staff accounts", "error");
+    return;
+  }
+
+  const fullName = document.getElementById("staff-full-name")?.value.trim() || "";
+  const username = document.getElementById("staff-username")?.value.trim().toLowerCase() || "";
+  const password = document.getElementById("staff-password")?.value.trim() || "metro123";
+  const role = document.getElementById("staff-role")?.value || "staff";
+  const department = document.getElementById("staff-department")?.value || "All";
+  const designation = document.getElementById("staff-designation")?.value.trim() || "Station Controller";
+  const assignedStation = document.getElementById("staff-station")?.value || "All Stations";
+
+  if (!fullName || !username) {
+    showToast("Full Name and Username are required", "error");
+    return;
+  }
+
+  const payload = {
+    full_name: fullName,
+    username: username,
+    password: password,
+    role: role,
+    department: department,
+    designation: designation,
+    assigned_station: assignedStation
+  };
+
+  try {
+    const res = await fetch("/api/staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      showToast(`✓ Staff account '${username}' created for ${fullName}!`, "success");
+      document.getElementById("staff-create-form")?.reset();
+      await loadStaffAdminView();
+      return;
+    } else {
+      const err = await res.json().catch(() => ({}));
+      showToast(err.detail || "Could not create staff account", "error");
+      return;
+    }
+  } catch (err) {
+    // Offline fallback staff creation
+    const newStaff = {
+      id: Date.now(),
+      ...payload
+    };
+    state.staffList.push(newStaff);
+    localStorage.setItem("metrosetu_cached_staff", JSON.stringify(state.staffList));
+    showToast(`✓ Staff account '${username}' saved locally (Offline Mode)!`, "success");
+    document.getElementById("staff-create-form")?.reset();
+    renderStaffTable();
+  }
+}
+
+async function handleDeleteStaff(userId, username) {
+  if (!confirm(`Remove official staff account '${username}'?`)) return;
+
+  try {
+    const res = await fetch(`/api/staff/${userId}`, { method: "DELETE" });
+    if (res.ok) {
+      showToast(`Removed staff account '${username}'`, "info");
+      await loadStaffAdminView();
+      return;
+    }
+  } catch (e) {
+    // Offline fallback
+  }
+  state.staffList = (state.staffList || []).filter((u) => u.id !== userId);
+  localStorage.setItem("metrosetu_cached_staff", JSON.stringify(state.staffList));
+  renderStaffTable();
+  showToast(`Removed staff account '${username}'`, "info");
+}
+

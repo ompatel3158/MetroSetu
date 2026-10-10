@@ -634,6 +634,70 @@ async def sync_offline_actions(payload: Dict[str, Any] = Body(...)):
 
 
 # ============================================================================
+# API: GOVERNMENT STAFF AUTHENTICATION & ADMIN STAFF MANAGEMENT
+# ============================================================================
+
+class StaffLoginRequest(BaseModel):
+    username: str = Field(..., example="admin")
+    password: str = Field(..., example="admin123")
+
+
+class StaffCreateRequest(BaseModel):
+    username: str = Field(..., example="station_mgr_02")
+    password: str = Field("metro123", example="metro123")
+    full_name: str = Field(..., example="Bhavesh Solanki")
+    role: str = Field("staff", example="staff")
+    department: str = Field("All", example="Lifts & Escalators")
+    designation: str = Field("Station Controller", example="Station Controller")
+    assigned_station: str = Field("All Stations", example="Motera Stadium")
+
+
+@app.post("/api/auth/login")
+async def login_official(payload: StaffLoginRequest):
+    """Authenticates a GMRC Government Official (Staff or Chief Admin)."""
+    user = db.authenticate_staff(payload.username, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid GMRC official username or password")
+    return {
+        "status": "authenticated",
+        "user": user,
+        "message": f"Welcome, {user.get('full_name')} ({user.get('designation')})"
+    }
+
+
+@app.get("/api/staff")
+async def list_staff_accounts():
+    """Returns all registered GMRC government staff and admin accounts."""
+    return db.get_all_staff()
+
+
+@app.post("/api/staff", status_code=201)
+async def create_staff_account(payload: StaffCreateRequest):
+    """Creates a new government staff or admin account (Admin feature)."""
+    try:
+        created = db.create_staff_user(payload.model_dump())
+        return {
+            "status": "created",
+            "staff": created,
+            "message": f"Staff account '{created.get('username')}' created successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.delete("/api/staff/{user_id}")
+async def remove_staff_account(user_id: int):
+    """Removes a government staff account by ID (protects primary admin)."""
+    try:
+        deleted = db.delete_staff_user(user_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Staff account not found")
+        return {"status": "deleted", "message": "Staff account removed"}
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+
+
+# ============================================================================
 # API: DATABASE ENGINE TELEMETRY
 # ============================================================================
 

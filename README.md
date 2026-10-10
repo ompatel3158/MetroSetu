@@ -226,61 +226,175 @@ flowchart LR
 
 ---
 
-## ⚡ How to Install & Run UltSQL (Optional High-Performance Engine)
+## ⚡ Universal UltSQL Installation & Setup Guide
 
-**UltSQL** is a pure-Dart multimodal database engine combining Relational SQL, NoSQL JSON collections, Key-Value caching, and AI Vector search with zero dynamic C/C++ dependencies. MetroSetu supports UltSQL out of the box with zero-configuration fallback to SQLite.
+**ULTSQL** ([github.com/ompatel3158/ULTSQL](https://github.com/ompatel3158/ULTSQL) | [pub.dev/packages/ultsql](https://pub.dev/packages/ultsql) | [ultsql.tech](https://ultsql.tech)) is a **5-in-1 converged multimodal database engine** written in 100% pure Dart with **zero native C/C++ dependencies**. It unites **Relational SQL**, **MongoDB-Style NoSQL Document Collections**, **Redis-Style High-Throughput Key-Value Caching** (`1.28M ops/sec`), **PL/SQL Procedural Scripting**, and **AI-Native HNSW Vector RAG Search** (`<6 ms`) into a single ACID storage engine (`2.08M rows/sec` durable NVMe ingestion).
 
-### 1. Install the Python Client
-The Python client is included in `requirements.txt`:
+### 🌍 Universal Installation for All Languages & Operating Systems
+
+```mermaid
+graph TD
+    subgraph "Your Application (Any System)"
+        Py[🐍 Python]
+        Node[🟢 Node.js / TS]
+        Dart[💙 Flutter / Dart]
+        CLI[🖥️ Windows / Mac / Linux Executable]
+        Docker[🐳 Docker Container]
+    end
+
+    subgraph "Package Registries"
+        PyPI[PyPI: pip install ultsql]
+        NPM[NPM: npm install ultsql]
+        Pub[Pub.dev: package:ultsql]
+        Releases[GitHub Releases: ultsql.exe]
+        Hub[Docker Hub: docker run]
+    end
+
+    Py --> PyPI
+    Node --> NPM
+    Dart --> Pub
+    CLI --> Releases
+    Docker --> Hub
+```
+
+#### 1. 🖥️ 1-Line Standalone CLI Installers (Windows, macOS, Linux)
+**Zero Dependencies! Automatically downloads the standalone binary and adds `ultsql` to your system PATH:**
+
+- **Windows (PowerShell)**:
+  ```powershell
+  iwr -useb https://raw.githubusercontent.com/ompatel3158/ULTSQL/main/install.ps1 | iex
+  ```
+- **Linux & macOS (Bash)**:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/ompatel3158/ULTSQL/main/install.sh | bash
+  ```
+- **Pre-Bundled Offline Binary in this Repo (Windows)**:
+  This repository also includes `ultsql.exe` right in the root folder for 100% offline tunnel execution:
+  ```powershell
+  .\ultsql.exe serve --port=8080 --pgwire=5432 --db=./metro_ultsql_db
+  ```
+
+#### 2. 🐍 Python Developers (Used by MetroSetu `db.py`)
+**No Dart or Flutter required!**
 ```bash
 pip install ultsql
 ```
+```python
+from ultsql import UltSQLClient
 
-### 2. Run the UltSQL REST Daemon
-
-You have two simple ways to launch the UltSQL engine on port 8080:
-
-#### Option A: Using the Pre-Compiled Standalone Binary (Windows — Zero Dart required)
-The repository includes a compiled, zero-dependency `ultsql.exe` binary:
-```powershell
-.\ultsql.exe serve --port=8080 --db=./ultsql_data
-```
-*(Starts the UltSQL REST daemon immediately on `http://localhost:8080` with zero installation).*
-
-#### Option B: Using Dart SDK (Cross-Platform: Windows, Linux, macOS)
-If you have the [Dart SDK](https://dart.dev/get-dart) installed:
-```bash
-# If using the global pub package:
-dart pub global activate ultsql
-ultsql serve --port=8080 --db=./ultsql_data
-
-# OR if running directly from source:
-dart run bin/ultsql_cli.dart serve --port=8080 --db=./ultsql_data
+db = UltSQLClient("http://localhost:8080")
+db.insert("complaints", {"id": 1, "passenger_name": "Jayesh Patel", "urgency_level": "P1 Critical"})
+print(db.query("complaints"))
 ```
 
-### 3. Verify UltSQL is Active
-With the daemon running in a separate terminal:
+#### 3. 💙 Building & Running UltSQL from Source (Dart / Flutter SDK)
+If you have [Dart SDK 3.4+](https://dart.dev) or [Flutter SDK 3.22+](https://flutter.dev) installed:
 ```bash
-# Check daemon health
+# 1. Clone the official ULTSQL repository
+git clone https://github.com/ompatel3158/ULTSQL.git
+cd ULTSQL
+
+# 2. Install pure-Dart dependencies
+dart pub get
+
+# 3. Run the interactive CLI REPL or start the HTTP + PGWire server
+dart run bin/ultsql_cli.dart serve --port=8080 --pgwire=5432 --db=./metro_ultsql_db
+
+# 4. (Optional) Compile a standalone zero-dependency native executable
+dart compile exe bin/ultsql_cli.dart -o ultsql.exe
+```
+
+#### 4. 🟢 Node.js & TypeScript Developers
+```bash
+npm install ultsql
+```
+```javascript
+const { UltSQLClient } = require('ultsql');
+const db = new UltSQLClient({ host: 'localhost', port: 8080 });
+await db.insert('users', { id: 1, name: 'Alice' });
+console.log(await db.query('users'));
+```
+
+#### 5. 🐹 Go & 🦀 Rust & 💻 C/C++ Developers
+- **Go**:
+  ```bash
+  go get github.com/ompatel3158/ULTSQL/bindings/go
+  ```
+- **Rust (`Cargo.toml`)**:
+  ```toml
+  [dependencies]
+  ultsql = "1.0.24"
+  ```
+- **C / C++ (`CMakeLists.txt`)**:
+  ```cmake
+  include(FetchContent)
+  FetchContent_Declare(ultsql GIT_REPOSITORY https://github.com/ompatel3158/ULTSQL.git GIT_TAG v1.0.24)
+  FetchContent_MakeAvailable(ultsql)
+  target_link_libraries(my_app PRIVATE ultsql)
+  ```
+
+#### 6. 🐳 Docker Container & 🔌 PostgreSQL Wire Protocol
+```bash
+# Run UltSQL Server via Docker
+docker run -p 8080:8080 -v ./data:/db ompatel3158/ultsql serve --port 8080 --db /db
+
+# Or start the PostgreSQL v3 Wire Server (compatible with psql, psycopg2, JDBC, DBeaver)
+ultsql pgwire --port=5432 --db=./metro_ultsql_db
+```
+
+---
+
+### 🖥️ UltSQL CLI Subcommands & REPL Reference
+
+Once installed (`ultsql` or `.\ultsql.exe`), you can run these commands from any terminal:
+
+```bash
+ultsql metro_ultsql_db                                       # Interactive REPL with auto-completion
+ultsql bench 1000000                                         # Live 1M-row disk ingestion benchmark (2.08M rows/sec)
+ultsql metro_ultsql_db -c "SELECT * FROM complaints;" -m box # Headless query (modes: box, table, json, csv, markdown, line)
+ultsql export complaints complaints.json --db=./metro_ultsql_db  # Streaming table export to CSV or JSON
+ultsql import data.json complaints --db=./metro_ultsql_db        # High-speed batch import from CSV or JSON
+ultsql serve --port=8080 --pgwire=5432 --db=./metro_ultsql_db    # Combined REST API (:8080) & PostgreSQL wire daemon (:5432)
+```
+
+| REPL Meta Command | Description |
+| :--- | :--- |
+| `.tables` / `.schema [table]` | List all relational tables or inspect `CREATE TABLE` DDL and Row/Columnar layout. |
+| `.collections` | List all schema-less NoSQL document collections and document counts. |
+| `.kv [list\|get\|set\|del]` | Interactive Redis-style Key-Value operations with prefix matching and TTL. |
+| `db.<coll>.<action>(...)` | Direct MongoDB shell syntax (`find`, `insertOne`, `updateOne`, `count`). |
+| `.branch [list\|create\|switch\|merge]` | Git-like Copy-on-Write database branching for zero-risk testing & staging. |
+| `.explain <sql>` | Render the Volcano query iterator execution plan tree. |
+
+### 🔗 Verifying UltSQL Connection in MetroSetu
+With the UltSQL daemon running (`.\ultsql.exe serve --port=8080 --db=./ultsql_data`):
+```bash
 curl http://localhost:8080/health
-
-# Check MetroSetu active engine status
 curl http://localhost:8000/api/db/engine
 ```
-*Expected output from MetroSetu:*
+*Expected output:*
 ```json
 {
   "engine": "UltSQL",
   "status": "connected",
-  "host": "http://localhost:8080",
-  "fallback": false
+  "url": "http://localhost:8080",
+  "fallback": false,
+  "mode": "converged_sql_vector"
 }
 ```
+> **100% Resilient Fallback**: If `ultsql.exe` is stopped or not running, [`db.py`](file:///b:/temp/db.py) automatically and silently falls back to embedded **SQLite (`metro.db`)** so the app never crashes during an offline tunnel ride!
 
-### 4. What Happens if UltSQL is Stopped?
-You never have to worry about connection crashes:
-- If `ultsql.exe` is closed or not installed, [`db.py`](file:///b:/temp/db.py) **silently falls back to embedded SQLite (`metro.db`)**.
-- The entire application continues functioning 100% uninterrupted.
+---
+
+## 🔐 Role-Based Access Control (Passenger Public Mode vs. GMRC Officials & Admin)
+
+MetroSetu separates **public commuter features (no login required)** from **internal Government / GMRC Operations & Admin tools**:
+
+| Role / Mode | Sign-In Required? | Accessible Features | Default Demo Credentials |
+| :--- | :--- | :--- | :--- |
+| **👤 Normal Passenger (Public Commuter)** | **No Sign-In Needed** | • Prominent **`🚨 Report a Problem`** quick button in navbar<br>• **Public Passenger Helpdesk (`#passenger`)**: Submit complaints in Gujarati, Hindi, Gujlish, or English with instant AI routing & ticket ID<br>• **Live Station Status (`#stations`)**: View station accessibility, lines, and feeder buses (read-only; cannot add/edit/delete stations) | *Public (No Login)* |
+| **👮 GMRC Station Staff / Controller** | **Yes (`🏛️ Official Login`)** | • Everything in Public Mode, PLUS:<br>• **System Operations Dashboard (`#dashboard`)**<br>• **Multilingual Grievance Triage Console (`#triage`)** with trilingual reply dispatch<br>• **Alerts & On-Device AI Diagnostics (`#alerts`)** & fault logging | **Username:** `controller`<br>**Password:** `metro123`<br>*(or `safety_officer` / `metro123`)* |
+| **🛡️ GMRC Chief Admin** | **Yes (`🏛️ Official Login`)** | • Everything in Staff Mode, PLUS:<br>• **`👥 Manage Staff` (`#staff`)**: Create new government staff/official accounts, assign stations & departments, and manage existing staff<br>• **`+ Add Station` (`#station-form`)**, Edit/Delete stations, and **`Re-seed`** database | **Username:** `admin`<br>**Password:** `admin123` |
 
 ---
 

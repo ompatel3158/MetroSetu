@@ -210,6 +210,19 @@ def init_db():
             synced INTEGER DEFAULT 1
         );
 
+        CREATE TABLE IF NOT EXISTS staff_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            full_name TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'staff',
+            department TEXT NOT NULL DEFAULT 'All',
+            designation TEXT NOT NULL DEFAULT 'Station Controller',
+            assigned_station TEXT DEFAULT 'All Stations',
+            active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
         -- Performance Indices
         CREATE INDEX IF NOT EXISTS idx_ridership_station_time ON ridership_hourly(station_id, recorded_at);
         CREATE INDEX IF NOT EXISTS idx_ridership_anomaly ON ridership_hourly(is_anomaly);
@@ -220,7 +233,97 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status, urgency_score);
         CREATE INDEX IF NOT EXISTS idx_complaints_dept ON complaints(department);
         CREATE INDEX IF NOT EXISTS idx_complaints_lang ON complaints(detected_language);
+        CREATE INDEX IF NOT EXISTS idx_staff_username ON staff_users(username);
         """)
+    ensure_default_staff()
+
+
+def _hash_password(password: str) -> str:
+    """Pure Python SHA-256 salted hash for local offline staff authentication."""
+    import hashlib
+    salted = f"gmrc_metrosetu_2026::{password}".encode("utf-8")
+    return hashlib.sha256(salted).hexdigest()
+
+
+def ensure_default_staff():
+    """Seeds default Government / GMRC Admin and Staff accounts if none exist."""
+    existing = query_one("SELECT COUNT(*) AS cnt FROM staff_users")
+    if existing and existing.get("cnt", 0) > 0:
+        return
+
+    default_accounts = [
+        ("admin", _hash_password("admin123"), "Rajeshwar Rao, IAS", "admin", "Operations & Admin", "GMRC Chief Operations Admin", "All Stations"),
+        ("controller", _hash_password("metro123"), "Krunal Prajapati", "staff", "All", "Senior Station Controller", "Motera Stadium"),
+        ("safety_officer", _hash_password("metro123"), "Meera Jadeja", "staff", "Safety", "Chief Safety & Security Officer", "Old High Court Interchange"),
+        ("lifts_eng", _hash_password("metro123"), "Suresh Mistri", "staff", "Lifts & Escalators", "Lead Mechanical Engineer", "Kalupur Railway Station"),
+    ]
+    with get_connection() as conn:
+        conn.executemany("""
+            INSERT OR IGNORE INTO staff_users (username, password_hash, full_name, role, department, designation, assigned_station)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, default_accounts)
+
+
+def authenticate_staff(username: str, password: str) -> Optional[Dict[str, Any]]:
+    """Verify GMRC government staff or admin credentials locally."""
+    ensure_default_staff()
+    pw_hash = _hash_password(password.strip())
+    row = query_one("""
+        SELECT id, username, full_name, role, department, designation, assigned_station, active, created_at
+        FROM staff_users
+        WHERE LOWER(username) = LOWER(?) AND password_hash = ? AND active = 1
+    """, (username.strip(), pw_hash))
+    return row
+
+
+def get_all_staff() -> List[Dict[str, Any]]:
+    """Return all registered government staff and admin accounts (excluding password hashes)."""
+    ensure_default_staff()
+    return query_all("""
+        SELECT id, username, full_name, role, department, designation, assigned_station, active, created_at
+        FROM staff_users
+        ORDER BY CASE WHEN role = 'admin' THEN 0 ELSE 1 END, id ASC
+    """)
+
+
+def create_staff_user(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Create a new GMRC staff or admin user account (Admin feature)."""
+    ensure_default_staff()
+    username = (data.get("username") or "").strip().lower()
+    password = (data.get("password") or "metro123").strip()
+    full_name = (data.get("full_name") or "").strip()
+    role = (data.get("role") or "staff").strip().lower()
+    if role not in ("admin", "staff"):
+        role = "staff"
+    department = (data.get("department") or "All").strip()
+    designation = (data.get("designation") or "Station Controller").strip()
+    assigned_station = (data.get("assigned_station") or "All Stations").strip()
+
+    if not username or not full_name:
+        raise ValueError("Username and Full Name are required")
+
+    pw_hash = _hash_password(password)
+    new_id = execute_commit("""
+        INSERT INTO staff_users (username, password_hash, full_name, role, department, designation, assigned_station)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (username, pw_hash, full_name, role, department, designation, assigned_station))
+
+    return query_one("""
+        SELECT id, username, full_name, role, department, designation, assigned_station, active, created_at
+        FROM staff_users WHERE id = ?
+    """, (new_id,))
+
+
+def delete_staff_user(user_id: int) -> bool:
+    """Delete a staff account by ID (protects the primary admin account)."""
+    target = query_one("SELECT id, username, role FROM staff_users WHERE id = ?", (user_id,))
+    if not target:
+        return False
+    if target.get("username") == "admin":
+        raise ValueError("Cannot delete the primary GMRC Chief Admin account")
+    with get_connection() as conn:
+        cursor = conn.execute("DELETE FROM staff_users WHERE id = ?", (user_id,))
+        return cursor.rowcount > 0
 
 
 def reset_db():
@@ -233,6 +336,7 @@ def reset_db():
         DROP TABLE IF EXISTS asset_logs;
         DROP TABLE IF EXISTS ridership_hourly;
         DROP TABLE IF EXISTS stations;
+        DROP TABLE IF EXISTS staff_users;
         """)
     init_db()
 
