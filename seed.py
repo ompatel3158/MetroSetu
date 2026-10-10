@@ -38,6 +38,7 @@ def main():
     print(f"    - Infrastructure Assets: {summary['assets']}")
     print(f"    - Fault Events:      {summary['faults']}")
     print(f"    - Feeder Bus Routes: {summary['bus_connections']}")
+    print(f"    - Multilingual Complaints Triage: {summary.get('complaints', 0)}")
     print("\n[+] Ready for local operations. Start server with: python -m uvicorn main:app --reload")
 
 

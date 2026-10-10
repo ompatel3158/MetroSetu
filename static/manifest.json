@@ -1,0 +1,42 @@
+{
+  "name": "MetroSetu // મેટ્રો સેતુ",
+  "short_name": "MetroSetu",
+  "description": "On-Device Multilingual Passenger Grievance Triage & Metro Transit Operations Platform",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "categories": ["transportation", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/static/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Grievance Triage",
+      "short_name": "Triage",
+      "description": "Open Multilingual Grievance Console",
+      "url": "/#triage",
+      "icons": [{ "src": "/static/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Operations Dashboard",
+      "short_name": "Dashboard",
+      "description": "Real-time Operations & AI Telemetry",
+      "url": "/#dashboard",
+      "icons": [{ "src": "/static/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

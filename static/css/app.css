@@ -779,3 +779,724 @@ body {
   font-size: 0.75rem;
   margin-top: auto;
 }
+
+/* ============================================================================
+   METROSETU (PS-07) GRIEVANCE TRIAGE CONSOLE STYLES
+   100% Offline-Capable • Zero CDN • Pure System Fonts
+   ============================================================================ */
+
+/* Navigation Highlights */
+.nav-highlight {
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.4) !important;
+  background: rgba(56, 189, 248, 0.1) !important;
+  font-weight: 600 !important;
+}
+
+/* ----------------------------------------------------------------------------
+   URGENCY BADGES (Critical P1, High P2, Medium P3, Low P4)
+   ---------------------------------------------------------------------------- */
+.badge-p1 {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #fca5a5 !important;
+  border: 1px solid #ef4444 !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.45) !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge-p2 {
+  background: rgba(249, 115, 22, 0.2) !important;
+  color: #fdba74 !important;
+  border: 1px solid #f97316 !important;
+  box-shadow: 0 0 8px rgba(249, 115, 22, 0.3) !important;
+  font-weight: 600;
+}
+
+.badge-p3 {
+  background: rgba(245, 158, 11, 0.2) !important;
+  color: #fde68a !important;
+  border: 1px solid #f59e0b !important;
+  font-weight: 600;
+}
+
+.badge-p4 {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #93c5fd !important;
+  border: 1px solid #3b82f6 !important;
+  font-weight: 500;
+}
+
+/* ----------------------------------------------------------------------------
+   LANGUAGE PILLS (Gujarati, Hindi, Gujlish, English)
+   ---------------------------------------------------------------------------- */
+.lang-gujarati {
+  background: rgba(16, 185, 129, 0.18) !important;
+  color: #6ee7b7 !important;
+  border: 1px solid #10b981 !important;
+}
+
+.lang-hindi {
+  background: rgba(6, 182, 212, 0.18) !important;
+  color: #67e8f9 !important;
+  border: 1px solid #06b6d4 !important;
+}
+
+.lang-gujlish {
+  background: rgba(139, 92, 246, 0.18) !important;
+  color: #c4b5fd !important;
+  border: 1px solid #8b5cf6 !important;
+}
+
+.lang-english {
+  background: rgba(148, 163, 184, 0.18) !important;
+  color: #cbd5e1 !important;
+  border: 1px solid #64748b !important;
+}
+
+/* ----------------------------------------------------------------------------
+   TEST BATCH SIMULATOR DRAWER (1-Click Live Judge Demo)
+   ---------------------------------------------------------------------------- */
+.test-simulator-drawer {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.95));
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.simulator-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.simulator-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--accent-cyan);
+}
+
+.simulator-hint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.pulse-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+  animation: pulseDot 1.8s infinite;
+}
+
+@keyframes pulseDot {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.simulator-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.sample-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  border: 1px solid var(--border-subtle);
+  font-family: inherit;
+}
+
+.sample-chip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  filter: brightness(1.15);
+}
+
+.chip-lang-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.chip-snippet {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.chip-p {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------------------
+   DEPARTMENT QUEUE PILL TABS
+   ---------------------------------------------------------------------------- */
+.queue-tabs-container {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-width: thin;
+}
+
+.queue-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.queue-tab-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-tertiary);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.queue-tab-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+  font-weight: 600;
+}
+
+.queue-count-badge {
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--text-main);
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 600;
+}
+
+.queue-tab-btn.active .queue-count-badge {
+  background: var(--accent-cyan);
+  color: #0f172a;
+}
+
+/* ----------------------------------------------------------------------------
+   TRIAGE FILTER BAR
+   ---------------------------------------------------------------------------- */
+.triage-filter-bar {
+  margin-bottom: 1.25rem;
+}
+
+/* ----------------------------------------------------------------------------
+   TRIAGE WORKSPACE: RESPONSIVE SPLIT LAYOUT
+   ---------------------------------------------------------------------------- */
+.triage-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 480px);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.triage-queue-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.triage-queue-summary-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0 0.25rem;
+}
+
+.offline-sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid var(--accent-yellow);
+  color: var(--accent-yellow);
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.triage-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: calc(100vh - 270px);
+  overflow-y: auto;
+  padding-right: 0.35rem;
+  scrollbar-width: thin;
+}
+
+/* ----------------------------------------------------------------------------
+   GRIEVANCE CARD IN QUEUE
+   ---------------------------------------------------------------------------- */
+.triage-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.15rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.triage-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.triage-card.selected {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.4), 0 8px 24px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(135deg, rgba(30, 41, 59, 1), rgba(15, 23, 42, 0.95));
+}
+
+.triage-card.p1-urgency {
+  border-left: 4px solid #ef4444;
+}
+
+.triage-card.p2-urgency {
+  border-left: 4px solid #f97316;
+}
+
+.triage-card.p3-urgency {
+  border-left: 4px solid #f59e0b;
+}
+
+.triage-card.p4-urgency {
+  border-left: 4px solid #3b82f6;
+}
+
+.card-header-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.card-ticket-id {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.card-tags {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.card-body-text {
+  font-size: 0.92rem;
+  color: var(--text-main);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-meta-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 0.5rem;
+}
+
+.card-station-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ----------------------------------------------------------------------------
+   COMPLAINT INSPECTOR (Detail Drawer / Studio)
+   ---------------------------------------------------------------------------- */
+.triage-inspector-section {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.triage-inspector-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+
+.inspector-hero {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 1rem;
+}
+
+.inspector-hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.inspector-ticket-num {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.inspector-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.825rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+/* Urgency Score Meter */
+.urgency-meter-card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+}
+
+.meter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.825rem;
+  margin-bottom: 0.4rem;
+}
+
+.meter-track {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease;
+}
+
+.meter-fill.p1 { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+.meter-fill.p2 { background: linear-gradient(90deg, #3b82f6, #f97316); }
+.meter-fill.p3 { background: linear-gradient(90deg, #10b981, #f59e0b); }
+.meter-fill.p4 { background: #3b82f6; }
+
+.meter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Raw Complaint Display */
+.raw-complaint-box {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+}
+
+.raw-complaint-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.raw-complaint-text {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--text-main);
+  white-space: pre-wrap;
+}
+
+/* AI Diagnostics Box */
+.ai-diag-card {
+  background: rgba(6, 182, 212, 0.05);
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+}
+
+.ai-diag-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.ai-diag-reason {
+  font-size: 0.85rem;
+  color: var(--text-main);
+  line-height: 1.45;
+}
+
+/* Reply Dispatch Studio */
+.reply-studio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.studio-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.template-chips-wrap {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.template-chip {
+  background: var(--bg-tertiary);
+  color: var(--text-main);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 3px 8px;
+  font-size: 0.725rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.template-chip:hover {
+  background: var(--accent-cyan);
+  color: #0f172a;
+  border-color: var(--accent-cyan);
+}
+
+.draft-reply-textarea {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 90px;
+}
+
+.draft-reply-textarea:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
+
+.resolution-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* ----------------------------------------------------------------------------
+   MODAL DIALOG: NEW GRIEVANCE
+   ---------------------------------------------------------------------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  max-width: 640px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+  padding: 1.5rem;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.75rem;
+}
+
+.modal-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-close-btn:hover {
+  color: var(--text-main);
+}
+
+.ai-live-preview-box {
+  background: var(--bg-primary);
+  border: 1px dashed rgba(6, 182, 212, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.ai-live-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.775rem;
+  color: var(--accent-cyan);
+  margin-bottom: 0.5rem;
+}
+
+.ai-live-chips {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 1rem;
+  margin-top: 1.25rem;
+}
+
+/* ----------------------------------------------------------------------------
+   EMPTY STATE STYLING
+   ---------------------------------------------------------------------------- */
+.empty-queue-card {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.empty-queue-card svg {
+  margin: 0 auto 0.75rem auto;
+  color: var(--accent-cyan);
+}
+
+/* ----------------------------------------------------------------------------
+   RESPONSIVE DESIGN FOR TRIAGE CONSOLE
+   ---------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .triage-layout {
+    grid-template-columns: 1fr;
+  }
+  .triage-inspector-section {
+    position: static;
+    max-height: none;
+  }
+  .simulator-buttons-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .simulator-buttons-grid {
+    grid-template-columns: 1fr;
+  }
+  .queue-tab-btn {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  .triage-filter-bar {
+    flex-direction: column;
+  }
+}

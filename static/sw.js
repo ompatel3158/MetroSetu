@@ -3,16 +3,20 @@
    100% Offline-First Caching Strategy
    ============================================================================ */
 
-const CACHE_NAME = "metro-ops-v1";
+const CACHE_NAME = "metrosetu-ops-v2";
 
 // Core static assets required for the app shell to function offline
 const PRECACHE_ASSETS = [
   "/",
   "/sw.js",
+  "/manifest.json",
+  "/static/manifest.json",
   "/static/index.html",
   "/static/css/app.css",
   "/static/js/chart.min.js",
-  "/static/js/app.js"
+  "/static/js/app.js",
+  "/static/icon-192.svg",
+  "/static/icon-512.svg"
 ];
 
 // Install Event: pre-cache application shell

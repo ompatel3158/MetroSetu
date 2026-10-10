@@ -93,6 +93,35 @@ class AssetCreate(BaseModel):
     notes: Optional[str] = None
 
 
+class ComplaintTriageRequest(BaseModel):
+    raw_text: str = Field(..., example="લિફ્ટ બંધ છે અને વૃદ્ધ મુસાફરો ફસાયા છે")
+    station_name: Optional[str] = Field("", example="Motera Stadium")
+    passenger_name: Optional[str] = Field("Passenger", example="Jayesh Patel")
+    complaint_id: Optional[int] = None
+
+
+class ComplaintCreate(BaseModel):
+    station_id: Optional[int] = None
+    passenger_name: Optional[str] = "Anonymous Passenger"
+    channel: Optional[str] = "WhatsApp"
+    raw_text: str
+    department: Optional[str] = None
+    urgency_level: Optional[str] = None
+    urgency_score: Optional[int] = None
+    urgency_reason: Optional[str] = None
+    detected_language: Optional[str] = None
+    draft_reply: Optional[str] = None
+    status: Optional[str] = "Open"
+    reported_at: Optional[str] = None
+    resolved_at: Optional[str] = None
+
+
+class ComplaintStatusUpdate(BaseModel):
+    status: str = Field(..., example="Resolved")
+    draft_reply: Optional[str] = None
+    resolution_notes: Optional[str] = None
+
+
 # ============================================================================
 # ROOT & SERVICE WORKER ROUTES (Must be at root scope for PWA offline control)
 # ============================================================================
@@ -115,6 +144,13 @@ async def serve_service_worker():
     response.headers["Service-Worker-Allowed"] = "/"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+
+@app.get("/manifest.json", include_in_schema=False)
+async def serve_manifest():
+    """Serves the PWA Web App Manifest."""
+    manifest_path = os.path.join(STATIC_DIR, "manifest.json")
+    return FileResponse(manifest_path, media_type="application/manifest+json")
 
 
 # ============================================================================
@@ -326,6 +362,212 @@ async def trigger_seed(hours: int = Query(168, ge=24, le=336)):
     """Re-seeds sample metro data directly from the UI."""
     summary = db.seed_metro_data(hours_history=hours)
     return {"message": "Database re-seeded successfully", "summary": summary}
+
+
+# ============================================================================
+# API: PASSENGER COMPLAINTS & MULTILINGUAL TRIAGE (PS-07)
+# ============================================================================
+
+@app.get("/api/complaints")
+async def list_complaints(
+    station_id: Optional[int] = None,
+    status: Optional[str] = None,
+    department: Optional[str] = None,
+    urgency_level: Optional[str] = None,
+    language: Optional[str] = None,
+    search: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+):
+    """Retrieve passenger complaints with multi-field filtering and keyword search."""
+    complaints = db.get_complaints(
+        station_id=station_id,
+        status=status,
+        department=department,
+        urgency_level=urgency_level,
+        language=language,
+        limit=limit,
+        offset=offset
+    )
+    if search:
+        s_lower = search.lower()
+        complaints = [
+            c for c in complaints
+            if s_lower in c.get("raw_text", "").lower()
+            or s_lower in c.get("passenger_name", "").lower()
+            or s_lower in c.get("station_name", "").lower()
+            or s_lower in c.get("department", "").lower()
+            or s_lower in str(c.get("id", "")).lower()
+        ]
+    return complaints
+
+
+@app.get("/api/complaints/kpis")
+async def get_complaints_kpis():
+    """Summary metrics, SLA resolution rates, and department triage distribution."""
+    return db.get_complaint_kpis()
+
+
+@app.get("/api/complaints/{complaint_id}")
+async def get_complaint_detail(complaint_id: int):
+    """Retrieve full details of a single passenger complaint."""
+    complaint = db.get_complaint_by_id(complaint_id)
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    return complaint
+
+
+@app.post("/api/complaints/triage")
+async def triage_complaint_endpoint(payload: ComplaintTriageRequest):
+    """
+    On-device multilingual NLP triage for raw complaint text:
+    Detects script and language (Gujarati, Hindi, Gujlish, English),
+    classifies target transit department, scores urgency (P1 Critical to P4 Low),
+    and synthesizes an empathetic official draft response.
+    """
+    result = ai_engine.triage_complaint(
+        text=payload.raw_text,
+        station_name=payload.station_name or "",
+        passenger_name=payload.passenger_name or "Passenger",
+        complaint_id=payload.complaint_id
+    )
+    return result
+
+
+@app.post("/api/complaints", status_code=201)
+async def create_new_complaint(payload: ComplaintCreate):
+    """
+    Submits a new grievance.
+    Automatically runs on-device multilingual triage (language detection,
+    department classification, urgency scoring, and draft response generation).
+    """
+    station_name = "Gujarat Metro"
+    if payload.station_id:
+        st = db.get_station_by_id(payload.station_id)
+        if st:
+            station_name = st["name"]
+
+    triage_res = ai_engine.triage_complaint(
+        text=payload.raw_text,
+        passenger_name=payload.passenger_name or "Passenger",
+        station_name=station_name
+    )
+
+    dept = payload.department or triage_res.get("department")
+    urgency_level = payload.urgency_level or triage_res.get("urgency_level")
+    urgency_score = payload.urgency_score or triage_res.get("urgency_score")
+    urgency_reason = payload.urgency_reason or triage_res.get("urgency_reason")
+    detected_language = payload.detected_language or triage_res.get("detected_language")
+    draft_reply = payload.draft_reply or triage_res.get("draft_reply", "")
+
+    data = {
+        "station_id": payload.station_id or 1,
+        "passenger_name": payload.passenger_name or "Anonymous Passenger",
+        "channel": payload.channel or "WhatsApp",
+        "raw_text": payload.raw_text,
+        "detected_language": detected_language,
+        "department": dept,
+        "urgency_score": urgency_score,
+        "urgency_level": urgency_level,
+        "urgency_reason": urgency_reason,
+        "draft_reply": draft_reply,
+        "status": payload.status or "Open",
+        "reported_at": payload.reported_at or datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+        "resolved_at": payload.resolved_at,
+        "synced": 1
+    }
+    new_id = db.create_complaint(data)
+    created = db.get_complaint_by_id(new_id)
+    return {"id": new_id, "complaint": created, "message": "Grievance registered and triaged"}
+
+
+@app.post("/api/complaints/batch", status_code=201)
+async def create_complaints_batch(payload: Any = Body(...)):
+    """
+    Batch ingests complaints, runs pure-Python NLP triage for each,
+    and bulk-persists them to the database.
+    """
+    items = []
+    if isinstance(payload, list):
+        items = payload
+    elif isinstance(payload, dict) and "complaints" in payload:
+        items = payload["complaints"]
+    elif isinstance(payload, dict):
+        items = [payload]
+
+    batch_to_insert = []
+    now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    for item in items:
+        raw_text = item.get("raw_text") or item.get("complaint_text") or ""
+        p_name = item.get("passenger_name", "Anonymous Passenger")
+        st_id = item.get("station_id") or 1
+        st = db.get_station_by_id(st_id)
+        st_name = st["name"] if st else "Gujarat Metro"
+
+        triage_res = ai_engine.triage_complaint(
+            text=raw_text,
+            passenger_name=p_name,
+            station_name=st_name
+        )
+
+        dept = item.get("department") or triage_res.get("department")
+        urg_lvl = item.get("urgency_level") or triage_res.get("urgency_level")
+        urg_score = item.get("urgency_score") or triage_res.get("urgency_score")
+        urg_reason = item.get("urgency_reason") or triage_res.get("urgency_reason")
+        lang = item.get("detected_language") or triage_res.get("detected_language")
+        draft = item.get("draft_reply") or triage_res.get("draft_reply", "")
+
+        batch_to_insert.append({
+            "station_id": st_id,
+            "passenger_name": p_name,
+            "channel": item.get("channel", "WhatsApp"),
+            "raw_text": raw_text,
+            "detected_language": lang,
+            "department": dept,
+            "urgency_score": urg_score,
+            "urgency_level": urg_lvl,
+            "urgency_reason": urg_reason,
+            "draft_reply": draft,
+            "status": item.get("status", "Open"),
+            "reported_at": item.get("reported_at") or now_iso,
+            "resolved_at": item.get("resolved_at"),
+            "synced": 1
+        })
+
+    inserted_count = db.bulk_create_complaints(batch_to_insert)
+
+    return {
+        "status": "success",
+        "count": inserted_count,
+        "message": f"Successfully triaged and ingested {inserted_count} complaints"
+    }
+
+
+@app.patch("/api/complaints/{complaint_id}/status")
+async def update_complaint_status_endpoint(complaint_id: int, payload: ComplaintStatusUpdate):
+    """
+    Updates complaint status (e.g. Open -> In Progress -> Resolved) and records resolution timestamp.
+    """
+    resolved_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S") if payload.status == "Resolved" else None
+    success = db.update_complaint_status(complaint_id, payload.status, resolved_at=resolved_at)
+    if not success:
+        raise HTTPException(status_code=404, detail="Complaint not found")
+    updated = db.get_complaint_by_id(complaint_id)
+    return {
+        "message": f"Complaint status updated to {payload.status}",
+        "complaint": updated
+    }
+
+
+# ============================================================================
+# API: DATABASE ENGINE TELEMETRY
+# ============================================================================
+
+@app.get("/api/db/engine")
+async def get_database_engine():
+    """Returns active database engine telemetry (UltSQL probe status + SQLite fallback)."""
+    return db.get_active_db_engine()
 
 
 # ============================================================================

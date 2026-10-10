@@ -20,6 +20,64 @@ from contextlib import contextmanager
 from typing import List, Dict, Any, Optional
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "metro.db")
+ULTSQL_URL = os.environ.get("ULTSQL_URL", "http://localhost:8080")
+
+# Probe cache to prevent synchronous network latency during offline operation
+_ultsql_last_probe_time = 0.0
+_ultsql_last_probe_status = False
+_PROBE_CACHE_TTL = 3.0  # seconds
+
+
+def probe_ultsql(timeout: float = 0.3) -> bool:
+    """
+    Probe whether the UltSQL daemon is active at ULTSQL_URL (http://localhost:8080).
+    Cached with a 3-second TTL to avoid blocking requests when offline.
+    """
+    global _ultsql_last_probe_time, _ultsql_last_probe_status
+    import time
+    now = time.time()
+    if now - _ultsql_last_probe_time < _PROBE_CACHE_TTL:
+        return _ultsql_last_probe_status
+
+    import urllib.request
+    _ultsql_last_probe_time = now
+    try:
+        req = urllib.request.Request(
+            f"{ULTSQL_URL}/health",
+            headers={"User-Agent": "MetroSetu-DB/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            _ultsql_last_probe_status = (resp.status == 200)
+    except Exception:
+        _ultsql_last_probe_status = False
+
+    return _ultsql_last_probe_status
+
+
+def get_active_db_engine() -> Dict[str, Any]:
+    """
+    Probes database engine status. Returns UltSQL details if daemon is live,
+    otherwise automatically and silently falls back to local SQLite (metro.db).
+    """
+    is_live = probe_ultsql()
+    if is_live:
+        return {
+            "engine": "UltSQL",
+            "status": "connected",
+            "url": ULTSQL_URL,
+            "fallback": False,
+            "mode": "converged_sql_vector",
+            "details": "UltSQL Pure Dart Converged Engine (Relational + Vector + JSON)"
+        }
+    return {
+        "engine": "SQLite",
+        "status": "active",
+        "url": None,
+        "fallback": True,
+        "db_path": DB_PATH,
+        "mode": "local_embedded",
+        "details": "Local SQLite 3 Engine (100% Offline-First Fallback)"
+    }
 
 
 # ============================================================================
@@ -134,12 +192,34 @@ def init_db():
             status TEXT DEFAULT 'On Time'
         );
 
+        CREATE TABLE IF NOT EXISTS complaints (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            station_id INTEGER NOT NULL REFERENCES stations(id) ON DELETE CASCADE,
+            passenger_name TEXT NOT NULL,
+            channel TEXT DEFAULT 'WhatsApp',
+            raw_text TEXT NOT NULL,
+            detected_language TEXT NOT NULL,
+            department TEXT NOT NULL,
+            urgency_score INTEGER NOT NULL,
+            urgency_level TEXT NOT NULL,
+            urgency_reason TEXT,
+            draft_reply TEXT,
+            status TEXT NOT NULL DEFAULT 'Open',
+            reported_at TEXT NOT NULL,
+            resolved_at TEXT,
+            synced INTEGER DEFAULT 1
+        );
+
         -- Performance Indices
         CREATE INDEX IF NOT EXISTS idx_ridership_station_time ON ridership_hourly(station_id, recorded_at);
         CREATE INDEX IF NOT EXISTS idx_ridership_anomaly ON ridership_hourly(is_anomaly);
         CREATE INDEX IF NOT EXISTS idx_faults_status ON fault_events(status, severity);
         CREATE INDEX IF NOT EXISTS idx_assets_station ON asset_logs(station_id);
         CREATE INDEX IF NOT EXISTS idx_bus_station ON bus_connections(station_id);
+        CREATE INDEX IF NOT EXISTS idx_complaints_station ON complaints(station_id);
+        CREATE INDEX IF NOT EXISTS idx_complaints_status ON complaints(status, urgency_score);
+        CREATE INDEX IF NOT EXISTS idx_complaints_dept ON complaints(department);
+        CREATE INDEX IF NOT EXISTS idx_complaints_lang ON complaints(detected_language);
         """)
 
 
@@ -147,6 +227,7 @@ def reset_db():
     """Drops all tables and re-initializes the schema (useful for re-seeding)."""
     with get_connection() as conn:
         conn.executescript("""
+        DROP TABLE IF EXISTS complaints;
         DROP TABLE IF EXISTS bus_connections;
         DROP TABLE IF EXISTS fault_events;
         DROP TABLE IF EXISTS asset_logs;
@@ -583,7 +664,210 @@ def get_kpis() -> Dict[str, Any]:
             "average_health": asset_stats["avg_health"] or 100.0,
             "degrading_count": asset_stats["degrading_assets"] or 0
         },
-        "anomalies_detected": anomaly_count
+        "anomalies_detected": anomaly_count,
+        "complaints": get_complaint_kpis()
+    }
+
+
+# ============================================================================
+# PASSENGER COMPLAINTS & NLP TRIAGE (PS-07)
+# ============================================================================
+
+def get_complaints(
+    station_id: Optional[int] = None,
+    status: Optional[str] = None,
+    department: Optional[str] = None,
+    urgency_level: Optional[str] = None,
+    language: Optional[str] = None,
+    limit: int = 100,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
+    """Retrieve passenger complaints with rich station context and multi-field filters."""
+    query = """
+        SELECT c.*, s.name as station_name, s.code as station_code, s.line_name
+        FROM complaints c
+        JOIN stations s ON s.id = c.station_id
+        WHERE 1=1
+    """
+    params: List[Any] = []
+    if station_id is not None:
+        query += " AND c.station_id = ?"
+        params.append(station_id)
+    if status:
+        query += " AND c.status = ?"
+        params.append(status)
+    if department:
+        query += " AND c.department = ?"
+        params.append(department)
+    if urgency_level:
+        query += " AND c.urgency_level = ?"
+        params.append(urgency_level)
+    if language:
+        query += " AND c.detected_language = ?"
+        params.append(language)
+
+    query += " ORDER BY c.urgency_score DESC, c.reported_at DESC LIMIT ? OFFSET ?"
+    safe_limit = int(getattr(limit, "default", limit) or 100)
+    safe_offset = int(getattr(offset, "default", offset) or 0)
+    params.extend([safe_limit, safe_offset])
+    return query_all(query, tuple(params))
+
+
+def get_complaint_by_id(complaint_id: int) -> Optional[Dict[str, Any]]:
+    """Fetch a single passenger complaint by ID with station metadata."""
+    query = """
+        SELECT c.*, s.name as station_name, s.code as station_code, s.line_name
+        FROM complaints c
+        JOIN stations s ON s.id = c.station_id
+        WHERE c.id = ?
+    """
+    return query_one(query, (complaint_id,))
+
+
+def create_complaint(data: Dict[str, Any]) -> int:
+    """Insert a new passenger complaint record and return its ID."""
+    from datetime import datetime
+    now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+
+    query = """
+        INSERT INTO complaints (
+            station_id, passenger_name, channel, raw_text,
+            detected_language, department, urgency_score, urgency_level,
+            urgency_reason, draft_reply, status, reported_at, resolved_at, synced
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (
+        data.get("station_id"),
+        data.get("passenger_name", "Anonymous Passenger"),
+        data.get("channel", "WhatsApp"),
+        data.get("raw_text", ""),
+        data.get("detected_language", "English"),
+        data.get("department", "Safety"),
+        int(data.get("urgency_score", 3)),
+        data.get("urgency_level", "P3 Medium"),
+        data.get("urgency_reason", ""),
+        data.get("draft_reply", ""),
+        data.get("status", "Open"),
+        data.get("reported_at") or now_iso,
+        data.get("resolved_at"),
+        1 if data.get("synced", 1) else 0
+    )
+    return execute_commit(query, params)
+
+
+def update_complaint_status(complaint_id: int, status: str, resolved_at: Optional[str] = None) -> bool:
+    """Update complaint status and manage resolution timestamp."""
+    from datetime import datetime
+    if status == "Resolved" and not resolved_at:
+        resolved_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    elif status != "Resolved":
+        resolved_at = None
+
+    query = "UPDATE complaints SET status = ?, resolved_at = ? WHERE id = ?"
+    with get_connection() as conn:
+        cursor = conn.execute(query, (status, resolved_at, complaint_id))
+        return cursor.rowcount > 0
+
+
+def bulk_create_complaints(complaints_list: List[Dict[str, Any]]) -> int:
+    """Bulk insert a collection of passenger complaints in a single transaction."""
+    if not complaints_list:
+        return 0
+
+    from datetime import datetime
+    now_iso = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    rows = []
+    for data in complaints_list:
+        rows.append((
+            data.get("station_id"),
+            data.get("passenger_name", "Anonymous Passenger"),
+            data.get("channel", "WhatsApp"),
+            data.get("raw_text", ""),
+            data.get("detected_language", "English"),
+            data.get("department", "Safety"),
+            int(data.get("urgency_score", 3)),
+            data.get("urgency_level", "P3 Medium"),
+            data.get("urgency_reason", ""),
+            data.get("draft_reply", ""),
+            data.get("status", "Open"),
+            data.get("reported_at") or now_iso,
+            data.get("resolved_at"),
+            1 if data.get("synced", 1) else 0
+        ))
+
+    with get_connection() as conn:
+        cursor = conn.executemany("""
+            INSERT INTO complaints (
+                station_id, passenger_name, channel, raw_text,
+                detected_language, department, urgency_score, urgency_level,
+                urgency_reason, draft_reply, status, reported_at, resolved_at, synced
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, rows)
+        return cursor.rowcount
+
+
+def get_complaint_kpis() -> Dict[str, Any]:
+    """Compute aggregate analytics, triage distributions, and resolution SLAs for complaints."""
+    with get_connection() as conn:
+        summary = conn.execute("""
+            SELECT
+                COUNT(*) as total,
+                SUM(CASE WHEN status != 'Resolved' THEN 1 ELSE 0 END) as open_count,
+                SUM(CASE WHEN status = 'Resolved' THEN 1 ELSE 0 END) as resolved_count,
+                SUM(CASE WHEN urgency_score = 5 OR urgency_level LIKE '%P1%' THEN 1 ELSE 0 END) as p1_count,
+                SUM(CASE WHEN urgency_score = 4 OR urgency_level LIKE '%P2%' THEN 1 ELSE 0 END) as p2_count,
+                SUM(CASE WHEN urgency_score = 3 OR urgency_level LIKE '%P3%' THEN 1 ELSE 0 END) as p3_count,
+                SUM(CASE WHEN urgency_score <= 2 OR urgency_level LIKE '%P4%' THEN 1 ELSE 0 END) as p4_count,
+                ROUND(AVG(urgency_score), 2) as avg_urgency
+            FROM complaints
+        """).fetchone()
+
+        dept_rows = conn.execute("""
+            SELECT department, COUNT(*) as count
+            FROM complaints
+            GROUP BY department
+            ORDER BY count DESC
+        """).fetchall()
+
+        lang_rows = conn.execute("""
+            SELECT detected_language, COUNT(*) as count
+            FROM complaints
+            GROUP BY detected_language
+            ORDER BY count DESC
+        """).fetchall()
+
+        channel_rows = conn.execute("""
+            SELECT channel, COUNT(*) as count
+            FROM complaints
+            GROUP BY channel
+            ORDER BY count DESC
+        """).fetchall()
+
+        status_rows = conn.execute("""
+            SELECT status, COUNT(*) as count
+            FROM complaints
+            GROUP BY status
+            ORDER BY count DESC
+        """).fetchall()
+
+    total = summary["total"] or 0
+    resolved = summary["resolved_count"] or 0
+    rate = round((resolved / total * 100), 1) if total > 0 else 0.0
+
+    return {
+        "total_complaints": total,
+        "open_complaints": summary["open_count"] or 0,
+        "resolved_complaints": resolved,
+        "resolution_rate_pct": rate,
+        "critical_p1": summary["p1_count"] or 0,
+        "high_p2": summary["p2_count"] or 0,
+        "medium_p3": summary["p3_count"] or 0,
+        "low_p4": summary["p4_count"] or 0,
+        "avg_urgency_score": summary["avg_urgency"] or 0.0,
+        "by_department": {r["department"]: r["count"] for r in dept_rows},
+        "by_language": {r["detected_language"]: r["count"] for r in lang_rows},
+        "by_channel": {r["channel"]: r["count"] for r in channel_rows},
+        "by_status": {r["status"]: r["count"] for r in status_rows}
     }
 
 
@@ -601,18 +885,18 @@ def seed_metro_data(hours_history: int = 168) -> Dict[str, int]:
 
     reset_db()
 
-    # 1. Stations Data
+    # 1. Stations Data (Gujarat Metro - Ahmedabad & Gandhinagar Corridors)
     stations_data = [
-        {"code": "MET-01", "name": "Central Hub Station", "line_name": "Red Line", "zone": 1, "status": "Operational", "daily_capacity": 85000, "is_accessible": 1, "latitude": 40.7527, "longitude": -73.9772, "opened_year": 2015},
-        {"code": "MET-02", "name": "Financial District", "line_name": "Red Line", "zone": 1, "status": "Operational", "daily_capacity": 70000, "is_accessible": 1, "latitude": 40.7075, "longitude": -74.0090, "opened_year": 2016},
-        {"code": "MET-03", "name": "North Tech Park", "line_name": "Red Line", "zone": 2, "status": "Operational", "daily_capacity": 60000, "is_accessible": 1, "latitude": 40.7831, "longitude": -73.9712, "opened_year": 2019},
-        {"code": "MET-04", "name": "Innovation Quarter", "line_name": "Red Line", "zone": 2, "status": "Operational", "daily_capacity": 45000, "is_accessible": 1, "latitude": 40.8116, "longitude": -73.9465, "opened_year": 2021},
-        {"code": "MET-05", "name": "Airport Terminal 1-3", "line_name": "Blue Line", "zone": 3, "status": "Operational", "daily_capacity": 65000, "is_accessible": 1, "latitude": 40.6413, "longitude": -73.7781, "opened_year": 2017},
-        {"code": "MET-06", "name": "Harbor Point & Ferry", "line_name": "Blue Line", "zone": 1, "status": "Operational", "daily_capacity": 52000, "is_accessible": 1, "latitude": 40.7013, "longitude": -74.0152, "opened_year": 2016},
-        {"code": "MET-07", "name": "University Campus", "line_name": "Green Line", "zone": 2, "status": "Operational", "daily_capacity": 55000, "is_accessible": 1, "latitude": 40.8075, "longitude": -73.9626, "opened_year": 2018},
-        {"code": "MET-08", "name": "Botanical Gardens", "line_name": "Green Line", "zone": 2, "status": "Operational", "daily_capacity": 35000, "is_accessible": 1, "latitude": 40.8623, "longitude": -73.8772, "opened_year": 2020},
-        {"code": "MET-09", "name": "Stadium & Arena", "line_name": "Yellow Line", "zone": 2, "status": "Maintenance", "daily_capacity": 95000, "is_accessible": 1, "latitude": 40.8296, "longitude": -73.9262, "opened_year": 2018},
-        {"code": "MET-10", "name": "Grand Arts Pavilion", "line_name": "Yellow Line", "zone": 1, "status": "Operational", "daily_capacity": 40000, "is_accessible": 1, "latitude": 40.7725, "longitude": -73.9835, "opened_year": 2019},
+        {"code": "MET-01", "name": "Motera Stadium", "line_name": "Red Line", "zone": 1, "status": "Operational", "daily_capacity": 85000, "is_accessible": 1, "latitude": 23.0913, "longitude": 72.5975, "opened_year": 2019},
+        {"code": "MET-02", "name": "Kalupur Railway Station", "line_name": "Blue Line", "zone": 1, "status": "Operational", "daily_capacity": 75000, "is_accessible": 1, "latitude": 23.0269, "longitude": 72.5997, "opened_year": 2019},
+        {"code": "MET-03", "name": "APMC", "line_name": "Red Line", "zone": 2, "status": "Operational", "daily_capacity": 55000, "is_accessible": 1, "latitude": 22.9863, "longitude": 72.5441, "opened_year": 2019},
+        {"code": "MET-04", "name": "Gandhinagar Capital", "line_name": "GN Branch Line", "zone": 3, "status": "Operational", "daily_capacity": 45000, "is_accessible": 1, "latitude": 23.2323, "longitude": 72.6486, "opened_year": 2022},
+        {"code": "MET-05", "name": "Old High Court Interchange", "line_name": "Interchange", "zone": 1, "status": "Operational", "daily_capacity": 90000, "is_accessible": 1, "latitude": 23.0416, "longitude": 72.5694, "opened_year": 2019},
+        {"code": "MET-06", "name": "Thaltej", "line_name": "Blue Line", "zone": 2, "status": "Operational", "daily_capacity": 52000, "is_accessible": 1, "latitude": 23.0504, "longitude": 72.5161, "opened_year": 2020},
+        {"code": "MET-07", "name": "Gujarat University", "line_name": "Blue Line", "zone": 2, "status": "Operational", "daily_capacity": 58000, "is_accessible": 1, "latitude": 23.0366, "longitude": 72.5476, "opened_year": 2020},
+        {"code": "MET-08", "name": "Infocity Gandhinagar", "line_name": "GN Branch Line", "zone": 3, "status": "Operational", "daily_capacity": 48000, "is_accessible": 1, "latitude": 23.1932, "longitude": 72.6322, "opened_year": 2022},
+        {"code": "MET-09", "name": "Kankaria East", "line_name": "Blue Line", "zone": 2, "status": "Operational", "daily_capacity": 62000, "is_accessible": 1, "latitude": 23.0063, "longitude": 72.6033, "opened_year": 2020},
+        {"code": "MET-10", "name": "Sabarmati", "line_name": "Red Line", "zone": 1, "status": "Operational", "daily_capacity": 60000, "is_accessible": 1, "latitude": 23.0805, "longitude": 72.5855, "opened_year": 2019},
     ]
 
     station_ids = []
@@ -742,23 +1026,20 @@ def seed_metro_data(hours_history: int = 168) -> Dict[str, int]:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """, faults_data)
 
-    # 5. Feeder Bus Connections
+    # 5. Feeder Bus Connections (AMTS / GSRTC / BRTS Metro Feeders)
     bus_data = [
-        (station_ids[0][0], "Route 101 Express", "Civic Center & North Plaza", 10, "On Time"),
-        (station_ids[0][0], "Route 44 Crosstown", "East Waterfront District", 15, "On Time"),
-        (station_ids[1][0], "Financial Rapid 12", "Battery Park & Wall St Ferry", 8, "On Time"),
-        (station_ids[2][0], "Tech Shuttle 7", "Silicon Park North & Campus 2", 12, "On Time"),
-        (station_ids[2][0], "Route 88 Circulator", "Innovation Commons", 15, "Delayed 5m"),
-        (station_ids[3][0], "Route 52", "BioTech Center & Research Lab", 20, "On Time"),
-        (station_ids[4][0], "AirLink Express A", "Long-Term Parking P4", 6, "On Time"),
-        (station_ids[4][0], "AirLink Express B", "Car Rental Center & Cargo 2", 10, "On Time"),
-        (station_ids[5][0], "Harbor Ferry Feeder 3", "Pier 11 Cruise Terminal", 15, "On Time"),
-        (station_ids[6][0], "Campus Transit Blue", "Medical Science Tower & Clinic", 8, "On Time"),
-        (station_ids[6][0], "Campus Transit Red", "Undergraduate Quad & Library", 10, "On Time"),
-        (station_ids[7][0], "Parks Shuttle 19", "Arboretum South Gate", 20, "On Time"),
-        (station_ids[8][0], "Arena Special Event 99", "East Parking Pavilion", 5, "On Time"),
-        (station_ids[8][0], "Route 23 Local", "Grand Boulevard & West Side", 15, "Delayed 10m"),
-        (station_ids[9][0], "Museum Link 6", "Symphony Hall & Arts Center", 12, "On Time"),
+        (station_ids[0][0], "AMTS 101 Express", "Chandkheda & Sabarmati D-Cabin", 10, "On Time"),
+        (station_ids[0][0], "BRTS Route 4D", "Visat Junction & Tapovan Circle", 12, "On Time"),
+        (station_ids[1][0], "AMTS 44 Crosstown", "Geeta Mandir Central Bus Terminus", 8, "On Time"),
+        (station_ids[2][0], "AMTS Shuttle 7", "Vasna & Jivraj Park Market", 12, "On Time"),
+        (station_ids[2][0], "BRTS Route 88", "Anjali Cross Roads & Paldi", 15, "Delayed 5m"),
+        (station_ids[3][0], "GSRTC 52 Capital", "Sachivalaya & Sector 10 Circle", 15, "On Time"),
+        (station_ids[4][0], "Metro Link Express", "Ashram Road & Income Tax", 6, "On Time"),
+        (station_ids[5][0], "AMTS Route 12", "Bopal Ring Road & Shilaj", 10, "On Time"),
+        (station_ids[6][0], "Campus Transit Blue", "LD Engineering & IIM Ahmedabad", 8, "On Time"),
+        (station_ids[7][0], "Capital Tech Shuttle", "TCS Garima Park & DA-IICT", 10, "On Time"),
+        (station_ids[8][0], "AMTS Lake Shuttle", "Kankaria Zoo & Maninagar Railway", 12, "On Time"),
+        (station_ids[9][0], "Bullet Train Feeder", "Sabarmati Multimodal Transport Hub", 8, "On Time"),
     ]
 
     with get_connection() as conn:
@@ -767,11 +1048,111 @@ def seed_metro_data(hours_history: int = 168) -> Dict[str, int]:
             VALUES (?, ?, ?, ?, ?)
         """, bus_data)
 
+    # 6. Passenger Complaints & Multilingual AI Triage (PS-07)
+    import ai_engine
+
+    code_to_id = {s_code: s_id for s_id, s_code, _ in station_ids}
+    code_to_name = {s_code: s_name for _, s_code, s_name in station_ids}
+
+    complaints_raw_data = [
+        # --- Gujarati Script ---
+        ("MET-01", "જયેશ પટેલ", "WhatsApp", "મોટેરા સ્ટેડિયમ પ્લેટફોર્મ ૧ પર લિફ્ટ અચાનક બંધ પડી ગઈ છે અને વરિષ્ઠ નાગરિકો ફસાયા છે! કૃપા કરીને જલદી મદદ મોકલો.", "In Progress", 1),
+        ("MET-02", "ભાવિકા શાહ", "Mobile App", "કાલુપુર રેલવે સ્ટેશન મેટ્રો ગેટ પાસે ખૂબ જ ગંદકી અને કચરો ફેલાયેલો છે, અસહ્ય દુર્ગંધ આવે છે.", "Open", 3),
+        ("MET-03", "દિનેશ પરમાર", "Station Kiosk", "એપીએમસી સ્ટેશન પર ટિકિટ વેન્ડિંગ મશીનમાં ૨૦૦ રૂપિયા કપાઈ ગયા પણ ટિકિટ ન આવી અને રિફંડ પણ નથી મળ્યું.", "Resolved", 12),
+        ("MET-04", "મહેશ દેસાઈ", "WhatsApp", "ગાંધીનગર કેપિટલ સ્ટેશન પર સિક્યોરિટી ગાર્ડ મુસાફરો સાથે ઉદ્ધત વર્તન કરી રહ્યો છે અને બૂમો પાડે છે.", "Open", 5),
+        ("MET-05", "કિરીટ જોષી", "WhatsApp", "ઓલ્ડ હાઈકોર્ટ ઇન્ટરચેન્જ પર પ્લેટફોર્મની ધાર પર ખુલ્લા વાયરમાંથી તણખા (સ્પાર્ક) નીકળે છે, મોટો અકસ્માત થઈ શકે છે!", "Escalated", 2),
+        ("MET-06", "હર્ષાબેન પંડ્યા", "Mobile App", "થલતેજ સ્ટેશને એસ્કેલેટર અચાનક બંધ થતા વૃદ્ધ મહિલા લપસી પડ્યા, વ્હીલચેર અને પ્રાથમિક સારવારની તાત્કાલિક જરૂર છે.", "In Progress", 4),
+        ("MET-07", "સંજય મહેતા", "Web Portal", "ગુજરાત યુનિવર્સિટી મેટ્રો સ્ટેશનના શૌચાલયમાં પાણીનું ભારે લીકેજ છે અને ખૂબ જ ગંદુ છે.", "Resolved", 24),
+        ("MET-08", "પૂજા ત્રિવેદી", "Mobile App", "ઇન્ફોસિટી ગાંધીનગર સ્ટેશને સ્માર્ટ કાર્ડ રિચાર્જ યુપીઆઈ સ્કેનર કામ કરતું નથી, લાંબી લાઇન થઈ ગઈ છે.", "Open", 6),
+        ("MET-09", "રેખા ચૌહાણ", "WhatsApp", "સાબરમતી સ્ટેશન પર મહિલા કોચમાં કેટલાક અસામાજિક તત્વો ઘૂસી ગયા છે અને છેડતી કરે છે, સિક્યોરિટી મોકલો.", "Escalated", 1),
+        ("MET-10", "અનિલ પ્રજાપતિ", "QR Code", "કાંકરિયા ઈસ્ટ સ્ટેશન પર આગામી મેટ્રો ટ્રેનનું સમયપત્રક ડિસ્પ્લે બોર્ડ બંધ છે, ટ્રેન ક્યારે આવશે તેની માહિતી આપો.", "Resolved", 36),
+
+        # --- Devanagari Hindi ---
+        ("MET-01", "रोहित शर्मा", "WhatsApp", "मोतेरा स्टेडियम स्टेशन के लिफ्ट में 4 यात्री पिछले 20 मिनट से फंसे हुए हैं, अलार्म काम नहीं कर रहा और दम घुट रहा है!", "In Progress", 1),
+        ("MET-02", "अजय वर्मा", "Mobile App", "कालूपुर स्टेशन पर प्लेटफॉर्म 2 पर भारी पानी भरा हुआ है, यात्री फिसल कर गिर रहे हैं, गंभीर चोट लग सकती है।", "Escalated", 2),
+        ("MET-04", "प्रियंका सिंह", "Mobile App", "गांधीनगर कैपिटल स्टेशन पर ऑटोमैटिक फेयर कलेक्शन (AFC) गेट बंद हो गया और मेरा स्मार्ट कार्ड अटक गया।", "Open", 8),
+        ("MET-03", "विकास यादव", "Station Kiosk", "एपीएमसी मेट्रो स्टेशन के टिकट काउंटर पर तैनात कर्मचारी बहुत बदतमीजी से बात कर रहा है और चिल्ला रहा है।", "Open", 14),
+        ("MET-05", "नीरज तिवारी", "Web Portal", "ओल्ड हाई कोर्ट इंटरचेंज के वॉशरूम में भयंकर गंदगी और दुर्गंध है, कोई सफाई कर्मचारी मौजूद नहीं है।", "Resolved", 18),
+        ("MET-10", "सुनील गुप्ता", "Mobile App", "साबरमती स्टेशन के एस्केलेटर की सीढ़ी से अजीब तेज आवाज आ रही है और झटका लग रहा है, तुरंत बंद करें।", "In Progress", 6),
+        ("MET-06", "अमित मिश्रा", "WhatsApp", "थलतेज स्टेशन पर रात के समय सिक्योरिटी गार्ड अपनी सीट पर सो रहा था, सुरक्षा व्यवस्था में भारी लापरवाही है।", "Open", 10),
+        ("MET-07", "रितु पांडे", "QR Code", "गुजरात यूनिवर्सिटी स्टेशन पर क्यूआर टिकट स्कैनर मोबाइल स्क्रीन को रीड नहीं कर पा रहा है।", "Resolved", 30),
+        ("MET-09", "संदीप कुमार", "WhatsApp", "कांकरिया ईस्ट स्टेशन पर ट्रैक के पास लावारिस बैग पड़ा हुआ है, कृपया तुरंत सुरक्षा जांच करें।", "Escalated", 2),
+        ("MET-08", "नेहा अग्रवाल", "Mobile App", "इन्फोसिटी गांधीनगर स्टेशन पर पीने के पानी के कूलर के पास बहुत कचरा पड़ा हुआ है, स्वच्छता की कमी है।", "Resolved", 40),
+
+        # --- Gujlish (Phonetic Romanized Gujarati) ---
+        ("MET-01", "Parth Prajapati", "WhatsApp", "Motera Stadium platform 2 par escalator bandh che ane vruddh loko atvayela che, jaldi chalu karo.", "In Progress", 3),
+        ("MET-02", "Hardik Patel", "Mobile App", "Kalupur station na washroom ma bilkul chokhkhaai nathi, bau gandki che ane badbu aave che.", "Open", 5),
+        ("MET-03", "Chirag Soni", "Station Kiosk", "APMC metro station par ticket counter wala bhai e extra bhaadu lidhu ane receipt pan nathi aapi.", "Open", 7),
+        ("MET-04", "Kinjal Vaghela", "WhatsApp", "Gandhinagar Capital station na lift ma 3 passenger fasayela che, darwajo nathi khulto! Emergency che!", "Escalated", 1),
+        ("MET-05", "Nirav Barot", "Mobile App", "Old High Court interchange par electrical box mathi dhuvado nikle che, koi moti aag lagi shake che!", "Escalated", 2),
+        ("MET-06", "Urvi Dave", "QR Code", "Thaltej station par smart card recharge karel che pan gate par balance zero batavay che, kem aavu?", "Resolved", 20),
+        ("MET-07", "Deep Trivedi", "Web Portal", "Gujarat University station par ticket checking staff passenger sathe kharab vartan kare che ane gaal aape che.", "Open", 9),
+        ("MET-10", "Dhaval Makwana", "WhatsApp", "Sabarmati station par track par kutru aavi gayu che, train rokvi padshe, motu jokham che.", "In Progress", 2),
+        ("MET-08", "Shraddha Raval", "Mobile App", "Infocity Gandhinagar station na drinking water area ma bilkul safai nathi, kachro ane gandki che.", "Resolved", 48),
+        ("MET-09", "Mehul Solanki", "Station Kiosk", "Kankaria East station par platform bench par kachro ane gutkha ni pichkari che, chokhkhaai karavo.", "Open", 11),
+
+        # --- English ---
+        ("MET-01", "David Miller", "WhatsApp", "Emergency at Motera Stadium: Dense smoke and burning smell observed near transformer room on concourse level.", "Escalated", 2),
+        ("MET-02", "Sneha Kothari", "Mobile App", "The wheelchair ramp and accessible elevator at Kalupur are out of service, a disabled commuter is stuck.", "In Progress", 4),
+        ("MET-03", "Vikram Rathod", "Mobile App", "Turnstile gate 4 deducted 50 rupees from my UPI via QR code, but the flap barrier failed to open at APMC.", "Resolved", 16),
+        ("MET-05", "Ananya Sen", "Web Portal", "Male security personnel at Old High Court gate was extremely rude and aggressive when asked for directions.", "Open", 8),
+        ("MET-04", "Marcus Vance", "Mobile App", "Platform screen door at Gandhinagar Capital is not aligning properly with train doors, major safety hazard.", "In Progress", 5),
+        ("MET-06", "Gaurav Modi", "Station Kiosk", "Dustbins overflowing with plastic bottles and food waste across platform 1 at Thaltej station.", "Resolved", 28),
+        ("MET-01", "Rohan Mehta", "QR Code", "General feedback: Need more frequent trains during IPL match days at Motera Stadium station.", "Resolved", 52)
+    ]
+
+    complaint_rows = []
+    for st_code, p_name, ch, raw_txt, stat, hrs_ago in complaints_raw_data:
+        s_id = code_to_id.get(st_code, station_ids[0][0])
+        s_name = code_to_name.get(st_code, "Gujarat Metro")
+
+        rep_dt = now - timedelta(hours=hrs_ago)
+        rep_iso = rep_dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+        res_iso = None
+        if stat == "Resolved":
+            res_dt = rep_dt + timedelta(hours=min(4, max(1, hrs_ago // 2)))
+            res_iso = res_dt.strftime("%Y-%m-%dT%H:%M:%S")
+
+        # Run on-device AI triage
+        triage = ai_engine.triage_complaint(
+            text=raw_txt,
+            station_name=s_name,
+            passenger_name=p_name
+        )
+
+        complaint_rows.append((
+            s_id,
+            p_name,
+            ch,
+            raw_txt,
+            triage["detected_language"],
+            triage["department"],
+            triage["urgency_score"],
+            triage["urgency_level"],
+            triage["urgency_reason"],
+            triage["draft_reply"],
+            stat,
+            rep_iso,
+            res_iso,
+            1  # synced
+        ))
+
+    with get_connection() as conn:
+        conn.executemany("""
+            INSERT INTO complaints (
+                station_id, passenger_name, channel, raw_text,
+                detected_language, department, urgency_score, urgency_level,
+                urgency_reason, draft_reply, status, reported_at, resolved_at, synced
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, complaint_rows)
+
     return {
         "stations": len(station_ids),
         "ridership_records": len(ridership_rows),
         "assets": len(asset_rows),
         "faults": len(faults_data),
-        "bus_connections": len(bus_data)
+        "bus_connections": len(bus_data),
+        "complaints": len(complaint_rows)
     }
 
