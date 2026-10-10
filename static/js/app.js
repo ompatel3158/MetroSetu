@@ -40,7 +40,82 @@ const state = {
 };
 
 // ============================================================================
-// 1. SERVICE WORKER & OFFLINE DETECTION
+// 1. THEME SWITCHING (LIGHT & DARK MODE)
+// ============================================================================
+
+function initTheme() {
+  const savedTheme = localStorage.getItem("metrosetu_theme") || "light";
+  applyTheme(savedTheme);
+
+  const toggleBtn = document.getElementById("theme-toggle");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", () => {
+      const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+      const nextTheme = currentTheme === "light" ? "dark" : "light";
+      applyTheme(nextTheme);
+    });
+  }
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  localStorage.setItem("metrosetu_theme", theme);
+  const icon = document.getElementById("theme-toggle-icon");
+  if (icon) {
+    icon.textContent = theme === "dark" ? "☀️" : "🌙";
+  }
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute("content", theme === "dark" ? "#0a0d14" : "#f8fafc");
+  }
+}
+
+// ============================================================================
+// 2. MOBILE NAVIGATION DRAWER & HAMBURGER
+// ============================================================================
+
+function initMobileNavigation() {
+  const hamburger = document.getElementById("hamburger-btn");
+  const navMenu = document.getElementById("nav-menu");
+  const backdrop = document.getElementById("nav-backdrop");
+
+  if (!hamburger || !navMenu) return;
+
+  const toggleMenu = () => {
+    const isOpen = navMenu.classList.contains("mobile-open");
+    if (isOpen) {
+      closeMenu();
+    } else {
+      openMenu();
+    }
+  };
+
+  const openMenu = () => {
+    navMenu.classList.add("mobile-open");
+    hamburger.classList.add("is-active");
+    hamburger.setAttribute("aria-expanded", "true");
+    if (backdrop) backdrop.classList.add("active");
+  };
+
+  const closeMenu = () => {
+    navMenu.classList.remove("mobile-open");
+    hamburger.classList.remove("is-active");
+    hamburger.setAttribute("aria-expanded", "false");
+    if (backdrop) backdrop.classList.remove("active");
+  };
+
+  hamburger.addEventListener("click", toggleMenu);
+  if (backdrop) backdrop.addEventListener("click", closeMenu);
+
+  document.querySelectorAll("#nav-menu .nav-link").forEach((link) => {
+    link.addEventListener("click", () => {
+      closeMenu();
+    });
+  });
+}
+
+// ============================================================================
+// 3. SERVICE WORKER & OFFLINE DETECTION
 // ============================================================================
 
 function initServiceWorker() {
@@ -76,6 +151,22 @@ function updateConnectionStatus(isOnline) {
   }
 }
 
+async function checkDatabaseEngine() {
+  try {
+    const res = await fetch("/api/db/engine");
+    if (res.ok) {
+      const data = await res.json();
+      const textEl = document.getElementById("db-engine-text");
+      if (textEl) {
+        textEl.textContent = data.engine === "ultsql" ? "UltSQL (Active)" : "SQLite";
+        textEl.title = `Persistence Engine: ${data.engine} (${data.details || ''})`;
+      }
+    }
+  } catch (e) {
+    // Keep cached
+  }
+}
+
 // Active heartbeat to differentiate localhost server status from pure browser network
 async function checkBackendHeartbeat() {
   try {
@@ -88,6 +179,7 @@ async function checkBackendHeartbeat() {
         showToast("Connected to transit operations server", "success");
       }
       updateConnectionStatus(true);
+      checkDatabaseEngine();
       syncOfflineComplaintQueue();
       return;
     }
@@ -852,47 +944,110 @@ function applyOfflineQueueMutations() {
 function updateOfflineQueueIndicator() {
   const badge = document.getElementById("offline-queue-badge");
   const text = document.getElementById("offline-queue-text");
-  if (!badge || !text) return;
-
+  const headerBadge = document.getElementById("sync-pending-badge");
   const count = state.offlineQueue.length;
-  if (count > 0) {
-    badge.style.display = "inline-flex";
-    text.textContent = `${count} offline resolution${count > 1 ? "s" : ""} queued`;
-  } else {
-    badge.style.display = "none";
+
+  if (headerBadge) {
+    if (count > 0) {
+      headerBadge.textContent = count;
+      headerBadge.style.display = "inline-flex";
+    } else {
+      headerBadge.style.display = "none";
+    }
+  }
+
+  if (badge && text) {
+    if (count > 0) {
+      badge.style.display = "inline-flex";
+      text.textContent = `${count} offline action${count > 1 ? "s" : ""} queued`;
+    } else {
+      badge.style.display = "none";
+    }
   }
 }
 
-async function syncOfflineComplaintQueue() {
-  if (!state.offlineQueue || state.offlineQueue.length === 0) return;
+async function syncOfflineComplaintQueue(isManual = false) {
+  if (!state.offlineQueue || state.offlineQueue.length === 0) {
+    if (isManual) {
+      showToast("Everything is in sync with central database", "info");
+    }
+    return;
+  }
+
+  const syncBtn = document.getElementById("btn-manual-sync");
+  if (syncBtn) syncBtn.classList.add("syncing");
+
   const items = [...state.offlineQueue];
   let synced = 0;
 
-  for (const item of items) {
-    try {
-      const res = await fetch(`/api/complaints/${item.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          status: item.status,
-          draft_reply: item.draft_reply,
-          resolution_notes: item.resolution_notes
-        })
-      });
-      if (res.ok) {
-        synced++;
-        state.offlineQueue = state.offlineQueue.filter((q) => q.id !== item.id);
+  try {
+    // Attempt batch sync endpoint first
+    const res = await fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ actions: items })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      synced = data.synced_count || items.length;
+      state.offlineQueue = [];
+    } else {
+      // Fallback: iterate items one by one
+      for (const item of items) {
+        try {
+          if (item.action === "status" || !item.action) {
+            const r = await fetch(`/api/complaints/${item.id}/status`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                status: item.status,
+                draft_reply: item.draft_reply,
+                resolution_notes: item.resolution_notes
+              })
+            });
+            if (r.ok) {
+              synced++;
+              state.offlineQueue = state.offlineQueue.filter((q) => q.id !== item.id);
+            }
+          } else if (item.action === "create") {
+            const r = await fetch("/api/complaints", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                passenger_name: item.passenger_name,
+                channel: item.channel,
+                raw_text: item.raw_text,
+                station_id: item.station_id,
+                department: item.department,
+                urgency_level: item.urgency_level
+              })
+            });
+            if (r.ok) {
+              synced++;
+              state.offlineQueue = state.offlineQueue.filter((q) => q.id !== item.id);
+            }
+          }
+        } catch (e) {
+          break;
+        }
       }
-    } catch (e) {
-      break;
     }
+  } catch (err) {
+    console.warn("Sync failed:", err);
+  } finally {
+    if (syncBtn) syncBtn.classList.remove("syncing");
   }
 
   localStorage.setItem("metrosetu_offline_queue", JSON.stringify(state.offlineQueue));
   updateOfflineQueueIndicator();
+
   if (synced > 0) {
-    showToast(`✓ Synced ${synced} offline grievance resolution(s) with server`, "success");
+    showToast(`✓ Synced ${synced} queued offline action(s) with central database!`, "success");
     if (state.currentView === "triage") loadTriageView();
+    else if (state.currentView === "dashboard") loadDashboardView();
+  } else if (isManual && state.offlineQueue.length > 0) {
+    showToast("Tunnel Mode: Server unreachable. Actions safely preserved in local queue.", "warning");
   }
 }
 
@@ -1333,6 +1488,7 @@ async function handleMarkInProgress(complaintId) {
 function queueOfflineResolution(id, status, draftReply, notes) {
   state.offlineQueue = state.offlineQueue.filter((q) => q.id !== id);
   state.offlineQueue.push({
+    action: "status",
     id: id,
     status: status,
     draft_reply: draftReply || "",
@@ -1341,7 +1497,23 @@ function queueOfflineResolution(id, status, draftReply, notes) {
   });
   localStorage.setItem("metrosetu_offline_queue", JSON.stringify(state.offlineQueue));
   updateOfflineQueueIndicator();
-  showToast("Offline: Resolution queued locally. Will sync when server is reachable.", "warning");
+  showToast("Offline Tunnel Mode: Resolution queued locally. Will auto-sync upon station arrival.", "warning");
+}
+
+function queueOfflineCreation(complaintData) {
+  state.offlineQueue.push({
+    action: "create",
+    passenger_name: complaintData.passenger_name,
+    channel: complaintData.channel,
+    raw_text: complaintData.raw_text,
+    station_id: complaintData.station_id,
+    department: complaintData.department,
+    urgency_level: complaintData.urgency_level,
+    queued_at: new Date().toISOString()
+  });
+  localStorage.setItem("metrosetu_offline_queue", JSON.stringify(state.offlineQueue));
+  updateOfflineQueueIndicator();
+  showToast("Offline Tunnel Mode: Grievance queued locally. Will auto-sync upon station arrival.", "warning");
 }
 
 async function simulateTestBatch() {
@@ -1568,12 +1740,14 @@ async function handleGrievanceFormSubmit(e) {
       });
       if (res.ok) {
         showToast("✓ Grievance registered & triaged successfully!", "success");
+      } else {
+        queueOfflineCreation(newGrievance);
       }
     } catch (err) {
-      showToast("Registered locally in offline cache", "info");
+      queueOfflineCreation(newGrievance);
     }
   } else {
-    showToast("Registered locally in offline cache", "info");
+    queueOfflineCreation(newGrievance);
   }
 
   state.complaints.unshift(newGrievance);
@@ -2165,6 +2339,12 @@ async function triggerReSeed() {
 // ============================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Theme Switching (Gujarat Metro Orange / White + Light / Dark Mode)
+  initTheme();
+
+  // Mobile Navigation Drawer & Hamburger
+  initMobileNavigation();
+
   // Service Worker for offline capability
   initServiceWorker();
 
@@ -2172,11 +2352,22 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("hashchange", handleRouting);
   handleRouting();
 
+  // Update initial queue indicator
+  updateOfflineQueueIndicator();
+
   // Online / Offline window listeners
-  window.addEventListener("online", () => checkBackendHeartbeat());
+  window.addEventListener("online", () => {
+    checkBackendHeartbeat();
+    syncOfflineComplaintQueue();
+  });
   window.addEventListener("offline", () => updateConnectionStatus(false));
   checkBackendHeartbeat();
+  checkDatabaseEngine();
   setInterval(checkBackendHeartbeat, 8000);
+
+  // Manual Sync Button
+  const btnSync = document.getElementById("btn-manual-sync");
+  if (btnSync) btnSync.addEventListener("click", () => syncOfflineComplaintQueue(true));
 
   // Quick Seed Button
   const btnSeed = document.getElementById("btn-quick-seed");

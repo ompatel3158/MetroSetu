@@ -561,6 +561,79 @@ async def update_complaint_status_endpoint(complaint_id: int, payload: Complaint
 
 
 # ============================================================================
+# API: TWO-WAY CONNECTIVITY SYNC (Tunnel Reconnection Endpoint)
+# ============================================================================
+
+@app.post("/api/sync")
+async def sync_offline_actions(payload: Dict[str, Any] = Body(...)):
+    """
+    Two-way synchronization endpoint:
+    Applies queued offline actions (status updates and offline grievance creations)
+    recorded while traveling through metro tunnels.
+    """
+    actions = payload.get("actions", [])
+    applied_count = 0
+    errors = []
+
+    for item in actions:
+        act = item.get("action", "status")
+        try:
+            if act == "status" and item.get("id"):
+                c_id = item["id"]
+                st = item.get("status", "Resolved")
+                res_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S") if st == "Resolved" else None
+                db.update_complaint_status(c_id, st, resolved_at=res_time)
+                applied_count += 1
+            elif act == "create":
+                raw_text = item.get("raw_text", "")
+                if raw_text:
+                    p_name = item.get("passenger_name", "Anonymous Passenger")
+                    st_id = item.get("station_id") or 1
+                    st = db.get_station_by_id(st_id)
+                    st_name = st["name"] if st else "Gujarat Metro"
+                    
+                    triage_res = ai_engine.triage_complaint(
+                        text=raw_text,
+                        passenger_name=p_name,
+                        station_name=st_name
+                    )
+                    dept = item.get("department") or triage_res.get("department")
+                    urg_lvl = item.get("urgency_level") or triage_res.get("urgency_level")
+                    urg_score = item.get("urgency_score") or triage_res.get("urgency_score")
+                    urg_reason = item.get("urgency_reason") or triage_res.get("urgency_reason")
+                    lang = item.get("detected_language") or triage_res.get("detected_language")
+                    draft = item.get("draft_reply") or triage_res.get("draft_reply", "")
+                    
+                    c_data = {
+                        "station_id": st_id,
+                        "passenger_name": p_name,
+                        "channel": item.get("channel", "WhatsApp"),
+                        "raw_text": raw_text,
+                        "detected_language": lang,
+                        "department": dept,
+                        "urgency_score": urg_score,
+                        "urgency_level": urg_lvl,
+                        "urgency_reason": urg_reason,
+                        "draft_reply": draft,
+                        "status": item.get("status", "Open"),
+                        "reported_at": item.get("reported_at") or datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+                        "resolved_at": item.get("resolved_at"),
+                        "synced": 1
+                    }
+                    db.create_complaint(c_data)
+                    applied_count += 1
+        except Exception as e:
+            errors.append(str(e))
+
+    return {
+        "status": "success",
+        "synced_count": applied_count,
+        "errors": errors,
+        "server_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    }
+
+
+# ============================================================================
 # API: DATABASE ENGINE TELEMETRY
 # ============================================================================
 

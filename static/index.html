@@ -20,25 +20,35 @@
        TOP NAVIGATION BAR
        ======================================================================== -->
   <header class="navbar">
-    <div class="brand-section">
-      <!-- Inline SVG Logo: Metro / Transit Train -->
-      <svg class="brand-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="4" y="3" width="16" height="16" rx="2"></rect>
-        <path d="M4 11h16"></path>
-        <path d="M12 3v7"></path>
-        <path d="m8 19-3 3"></path>
-        <path d="m16 19 3 3"></path>
-        <circle cx="8" cy="15" r="1"></circle>
-        <circle cx="16" cy="15" r="1"></circle>
-      </svg>
-      <div class="brand-title">
-        <span>MetroSetu // મેટ્રો સેતુ</span>
-        <span class="brand-tag">Grievance Triage &amp; Ops</span>
+    <div class="navbar-left">
+      <!-- Mobile Hamburger Button -->
+      <button id="hamburger-btn" class="hamburger-btn" aria-label="Toggle navigation menu" aria-expanded="false">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
+
+      <!-- Brand Identity -->
+      <div class="brand-section">
+        <!-- Inline SVG Logo: Metro / Transit Train -->
+        <svg class="brand-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="3" width="16" height="16" rx="2"></rect>
+          <path d="M4 11h16"></path>
+          <path d="M12 3v7"></path>
+          <path d="m8 19-3 3"></path>
+          <path d="m16 19 3 3"></path>
+          <circle cx="8" cy="15" r="1"></circle>
+          <circle cx="16" cy="15" r="1"></circle>
+        </svg>
+        <div class="brand-title">
+          <span>MetroSetu // મેટ્રો સેતુ</span>
+          <span class="brand-tag">Grievance Triage &amp; Ops</span>
+        </div>
       </div>
     </div>
 
-    <!-- Navigation Links / Router Links -->
-    <nav>
+    <!-- Navigation Links (Desktop + Mobile Slide-out Drawer) -->
+    <nav class="nav-menu" id="nav-menu">
       <ul class="nav-links">
         <li><a href="#dashboard" class="nav-link active" data-view="dashboard">Dashboard</a></li>
         <li><a href="#triage" class="nav-link nav-highlight" data-view="triage">📢 Grievance Triage</a></li>
@@ -47,21 +57,42 @@
         <li><a href="#alerts" class="nav-link" data-view="alerts">Alerts &amp; AI</a></li>
       </ul>
     </nav>
+    <div id="nav-backdrop" class="nav-backdrop"></div>
 
-    <!-- Header Actions & Offline Indicator -->
+    <!-- Header Actions, Connectivity Sync & Theme Controls -->
     <div class="header-actions">
+      <!-- Database Engine Status Pill -->
+      <div id="db-engine-badge" class="engine-pill" title="Persistence Engine (UltSQL or SQLite fallback)">
+        <span class="engine-dot"></span>
+        <span id="db-engine-text">SQLite</span>
+      </div>
+
+      <!-- Two-Way Connectivity Sync Action -->
+      <button id="btn-manual-sync" class="btn-sync" title="Sync local queued actions with central database">
+        <svg class="sync-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+        </svg>
+        <span class="sync-label">Sync</span>
+        <span id="sync-pending-badge" class="sync-counter-badge" style="display: none;">0</span>
+      </button>
+
       <!-- Live Online / Offline Status Badge -->
       <div id="status-badge" class="status-pill online" title="Heartbeat status to localhost backend">
         <span class="status-dot"></span>
         <span id="status-text">ONLINE</span>
       </div>
 
+      <!-- Dark / Light Theme Toggle -->
+      <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Light / Dark Mode" aria-label="Toggle theme">
+        <span id="theme-toggle-icon">🌙</span>
+      </button>
+
       <!-- Quick Re-seed Button -->
-      <button id="btn-quick-seed" class="btn btn-outline btn-sm" title="Re-populate realistic metro data">
+      <button id="btn-quick-seed" class="btn btn-outline btn-sm btn-seed-header" title="Re-populate realistic metro data">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
         </svg>
-        <span>Re-seed</span>
+        <span class="seed-label">Re-seed</span>
       </button>
     </div>
   </header>

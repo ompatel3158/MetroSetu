@@ -52,6 +52,10 @@ On board the **Gujarat Metro (Ahmedabad – Gandhinagar)**, passenger grievances
   4. 🎫 **Fare & Ticketing** (UPI deduction failure, turnstile gates, TVM errors)
   5. 👤 **Staff Behaviour** (counter conduct, shouting guards, overcharging)
 - **✍️ Multilingual Empathetic Draft Replies**: Synthesizes polite, official replies in the passenger’s language with station context.
+- **🎨 Gujarat Metro Saffron/Orange & White UI**: Designed with official Gujarat Metro brand colors (`#ea580c` / `#f97316` / `#ffffff`) eliminating dark blue hues.
+- **☀️/🌙 Instant Light & Dark Mode**: High-contrast operations mode for daytime station booths + sleek dark mode for dimly lit tunnel cabins.
+- **📱 Fully Mobile Responsive & Hamburger Navigation**: Touch-friendly navigation drawer, adaptive KPI cards, and thumb-friendly resolution actions on smartphones.
+- **🔄 Two-Way Connectivity Sync**: Offline queue in `localStorage` captures resolutions and grievances created in tunnels; auto-synchronizes atomically via `POST /api/sync` once line connectivity or station Wi-Fi is restored (with manual "Sync Now" button).
 - **💾 Dual-Engine Persistence**: Connects to high-speed **UltSQL** when available, with automatic and silent fallback to embedded **SQLite (`metro.db`)**.
 - **📱 100% Offline PWA**: Installable standalone mobile app with local action queueing and sync when connectivity returns.
 

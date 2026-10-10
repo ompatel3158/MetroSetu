@@ -3,7 +3,7 @@
    100% Offline-First Caching Strategy
    ============================================================================ */
 
-const CACHE_NAME = "metrosetu-ops-v2";
+const CACHE_NAME = "metrosetu-ops-v3";
 
 // Core static assets required for the app shell to function offline
 const PRECACHE_ASSETS = [
