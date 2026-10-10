@@ -109,27 +109,33 @@
       <div class="section-header">
         <div>
           <h1 class="section-title">System Operations Dashboard</h1>
-          <p class="section-desc">Real-time metro line telemetry, passenger flow, fleet assets & AI predictions.</p>
+          <p class="section-desc">Real-time Gujarat Metro telemetry, live multilingual grievance triage &amp; on-device AI predictions.</p>
         </div>
         <div class="header-actions">
-          <button id="btn-dash-anom-scan" class="btn btn-primary btn-sm">
+          <a href="#triage" class="btn btn-primary btn-sm">
+            📢 Open Grievance Triage Console
+          </a>
+          <button id="btn-dash-anom-scan" class="btn btn-outline btn-sm">
             ⚡ Run AI Anomaly Scan
           </button>
         </div>
       </div>
 
-      <!-- KPI Summary Cards -->
+      <!-- Interactive KPI Summary Cards (Click to Navigate) -->
       <div class="kpi-grid">
-        <div class="kpi-card green-line">
+        <div class="kpi-card green-theme" style="cursor: pointer;" onclick="window.location.hash='#stations'" title="Click to manage stations">
           <div class="kpi-header">
             <span>Stations</span>
-            <span id="kpi-station-status">10 / 10 Active</span>
+            <span class="badge badge-operational" id="kpi-station-status">10 / 10 Active</span>
           </div>
           <div class="kpi-value" id="kpi-total-stations">10</div>
-          <div class="kpi-meta" id="kpi-line-count">Across 4 Metro Lines</div>
+          <div class="kpi-meta" style="display: flex; justify-content: space-between; align-items: center;">
+            <span id="kpi-line-count">Across 4 Metro Lines</span>
+            <strong style="color: var(--accent-orange);">Directory &rarr;</strong>
+          </div>
         </div>
 
-        <div class="kpi-card">
+        <div class="kpi-card orange-theme" style="cursor: pointer;" onclick="document.getElementById('chart-ridership-trend').scrollIntoView({behavior:'smooth'})">
           <div class="kpi-header">
             <span>24h Ridership</span>
             <span class="badge badge-operational">Live</span>
@@ -138,40 +144,99 @@
           <div class="kpi-meta" id="kpi-peak-hour">Peak: -- pax/hr</div>
         </div>
 
-        <div class="kpi-card yellow-line">
+        <div class="kpi-card" style="cursor: pointer;" onclick="window.location.hash='#stations'" title="Click to inspect station equipment">
           <div class="kpi-header">
             <span>Fleet Health</span>
-            <span id="kpi-asset-degrading">0 degrading</span>
+            <span class="badge badge-warning" id="kpi-asset-degrading">0 degrading</span>
           </div>
           <div class="kpi-value" id="kpi-asset-health">--%</div>
-          <div class="kpi-meta">Average equipment score</div>
+          <div class="kpi-meta" style="display: flex; justify-content: space-between;">
+            <span>Equipment score</span>
+            <strong style="color: var(--accent-orange);">Assets &rarr;</strong>
+          </div>
         </div>
 
-        <div class="kpi-card red-line">
+        <div class="kpi-card red-theme" style="cursor: pointer;" onclick="window.location.hash='#alerts'" title="Click to view system incidents">
           <div class="kpi-header">
             <span>Critical Faults</span>
             <span class="badge badge-critical" id="kpi-critical-faults">0 Critical</span>
           </div>
           <div class="kpi-value" id="kpi-active-faults">--</div>
-          <div class="kpi-meta">System incident logs</div>
+          <div class="kpi-meta" style="display: flex; justify-content: space-between;">
+            <span>Incident logs</span>
+            <strong style="color: var(--accent-orange);">Resolve &rarr;</strong>
+          </div>
         </div>
 
-        <div class="kpi-card" style="border-left: 4px solid var(--accent-red);">
+        <div class="kpi-card red-theme" style="cursor: pointer; border: 2px solid var(--accent-orange);" onclick="window.location.hash='#triage'" title="Click to open Multilingual Grievance Triage">
           <div class="kpi-header">
             <span>Passenger Grievances</span>
-            <span class="badge badge-critical" id="kpi-critical-grievances">0 P1 Critical</span>
+            <span class="badge badge-p1" id="kpi-critical-grievances">0 P1 Critical</span>
           </div>
           <div class="kpi-value" id="kpi-active-grievances">--</div>
-          <div class="kpi-meta" id="kpi-grievance-meta">SLA Resolution: <strong id="kpi-grievance-rate">--%</strong></div>
+          <div class="kpi-meta" id="kpi-grievance-meta" style="display: flex; justify-content: space-between;">
+            <span>SLA Resolved: <strong id="kpi-grievance-rate">--%</strong></span>
+            <strong style="color: var(--accent-orange);">Triage &rarr;</strong>
+          </div>
         </div>
 
-        <div class="kpi-card">
+        <div class="kpi-card" style="cursor: pointer;" onclick="window.location.hash='#alerts'" title="Click to inspect AI ridership outliers">
           <div class="kpi-header">
             <span>AI Anomalies</span>
             <span class="badge badge-warning">On-Device</span>
           </div>
           <div class="kpi-value" id="kpi-anomalies-count">--</div>
-          <div class="kpi-meta">Flagged ridership outliers</div>
+          <div class="kpi-meta" style="display: flex; justify-content: space-between;">
+            <span>Ridership outliers</span>
+            <strong style="color: var(--accent-orange);">Scan &rarr;</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Operations Command Hub: Quick Triage + Priority P1/P2 Grievance Action Feed -->
+      <div class="dash-ops-grid">
+        <!-- Left: Instant Multilingual Quick-Triage Box -->
+        <div class="dash-hub-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="pulse-indicator"></span>
+              <strong style="font-size: 1rem;">⚡ Instant Multilingual Quick-Triage (PS-07)</strong>
+            </div>
+            <span class="badge badge-info">100% On-Device NLP</span>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted);">
+            Paste or type any commuter complaint in <strong>Gujarati, Hindi, Gujlish, or English</strong> to auto-classify urgency &amp; route immediately:
+          </p>
+          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+            <button type="button" class="template-chip" onclick="fillDashQuickTriage('લિફ્ટ બંધ છે અને વૃદ્ધ મુસાફરો ફસાયા છે')">ગુજરાતી: Lift Trapped (P1)</button>
+            <button type="button" class="template-chip" onclick="fillDashQuickTriage('Platform 2 par water leakage chhe, slip thavay evu chhe')">Gujlish: Water Leak (P1)</button>
+            <button type="button" class="template-chip" onclick="fillDashQuickTriage('TVM मशीन में ₹100 कट गए पर टिकट नहीं निकला')">हिन्दी: TVM Refund (P2)</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <input type="text" id="dash-quick-triage-input" class="form-control" style="flex: 1; min-width: 200px;" placeholder="Type complaint e.g. 'Lift bandh che Kalupur par'...">
+            <button type="button" id="btn-dash-quick-triage" class="btn btn-primary" onclick="submitDashQuickTriage()">
+              ⚡ Triage &amp; Route
+            </button>
+          </div>
+          <div id="dash-quick-triage-preview" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; font-size: 0.78rem; background: var(--bg-tertiary); padding: 0.5rem 0.75rem; border-radius: 8px;">
+            <span>Detected: <strong id="dash-prev-lang" class="badge lang-english">English</strong></span>
+            <span>Queue: <strong id="dash-prev-dept" class="badge">Safety</strong></span>
+            <span>Urgency: <strong id="dash-prev-urg" class="badge badge-p3">P3 Medium</strong></span>
+          </div>
+        </div>
+
+        <!-- Right: Priority P1/P2 Passenger Grievances Action Feed -->
+        <div class="dash-hub-card">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <strong style="font-size: 1rem;">🚨 Priority P1/P2 Grievance Queue</strong>
+              <span class="badge badge-p1" id="dash-urgent-count-badge">Live</span>
+            </div>
+            <a href="#triage" class="btn btn-outline btn-sm">Full Triage Console &rarr;</a>
+          </div>
+          <div id="dash-urgent-grievances-list" class="dash-urgent-list">
+            <!-- Dynamically populated by app.js with top P1/P2 open complaints -->
+          </div>
         </div>
       </div>
 
@@ -186,7 +251,7 @@
           <div>
             <div class="ai-banner-title">Pure Python On-Device AI Intelligence</div>
             <div class="ai-banner-subtitle">
-              Modified Z-Score Outlier Detection & Holt-Winters 24-Hour Demand Forecast (Zero cloud APIs).
+              Modified Z-Score Outlier Detection &amp; Holt-Winters 24-Hour Demand Forecast (Zero cloud APIs).
             </div>
           </div>
         </div>

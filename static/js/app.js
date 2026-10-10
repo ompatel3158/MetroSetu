@@ -362,10 +362,165 @@ async function loadDashboardView() {
       if (!complaintsData.length) complaintsData = PRECALIBRATED_TEST_BATCH;
     }
     renderGrievanceCharts(complaintsData);
+    renderDashboardUrgentGrievances(complaintsData);
+
+    const dashInput = document.getElementById("dash-quick-triage-input");
+    if (dashInput && !dashInput.dataset.bound) {
+      dashInput.dataset.bound = "true";
+      dashInput.addEventListener("input", (e) => {
+        updateDashQuickTriagePreview(e.target.value);
+      });
+    }
 
   } catch (err) {
     console.error("Error loading dashboard data:", err);
   }
+}
+
+function renderDashboardUrgentGrievances(complaints) {
+  const listEl = document.getElementById("dash-urgent-grievances-list");
+  const countBadge = document.getElementById("dash-urgent-count-badge");
+  if (!listEl) return;
+
+  const urgentOpen = (complaints || []).filter(
+    (c) => c.status !== "Resolved" && (String(c.urgency_level).includes("P1") || String(c.urgency_level).includes("P2") || (c.urgency_score || 0) >= 4)
+  );
+
+  if (countBadge) {
+    countBadge.textContent = `${urgentOpen.length} Priority Open`;
+  }
+
+  const topItems = urgentOpen.slice(0, 4);
+  if (topItems.length === 0) {
+    listEl.innerHTML = `
+      <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.85rem;">
+        ✓ Zero open P1/P2 priority grievances! All critical passenger issues resolved.
+      </div>
+    `;
+    return;
+  }
+
+  listEl.innerHTML = topItems.map((c) => {
+    const langClass = getLanguagePillClass(c.detected_language);
+    const urgClass = getUrgencyBadgeClass(c.urgency_level, c.urgency_score);
+    const snippet = (c.raw_text || "").length > 68 ? c.raw_text.slice(0, 68) + "..." : c.raw_text;
+    return `
+      <div class="dash-urgent-item" onclick="inspectComplaintFromDashboard(${c.id})">
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
+            <span class="badge ${urgClass}" style="font-size: 0.68rem; padding: 1px 6px;">${c.urgency_level || "P1 Critical"}</span>
+            <span class="badge ${langClass}" style="font-size: 0.68rem; padding: 1px 6px;">${c.detected_language}</span>
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted);">📍 ${c.station_name || "Station"} &bull; ${c.department}</span>
+          </div>
+          <div style="font-size: 0.84rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${escapeHtml(snippet)}
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline btn-sm" style="white-space: nowrap;">
+          Inspect &rarr;
+        </button>
+      </div>
+    `;
+  }).join("");
+}
+
+function inspectComplaintFromDashboard(complaintId) {
+  state.selectedComplaintId = complaintId;
+  state.activeDept = "All";
+  state.activeLang = "";
+  state.activeUrgency = "";
+  state.activeStatus = "";
+  window.location.hash = "#triage";
+}
+
+function fillDashQuickTriage(sampleText) {
+  const input = document.getElementById("dash-quick-triage-input");
+  if (!input) return;
+  input.value = sampleText;
+  updateDashQuickTriagePreview(sampleText);
+}
+
+function updateDashQuickTriagePreview(text) {
+  const res = triageTextClientSide(text);
+  const elLang = document.getElementById("dash-prev-lang");
+  const elDept = document.getElementById("dash-prev-dept");
+  const elUrg = document.getElementById("dash-prev-urg");
+  if (elLang) {
+    elLang.textContent = res.language;
+    elLang.className = "badge " + getLanguagePillClass(res.language);
+  }
+  if (elDept) {
+    elDept.textContent = res.department;
+  }
+  if (elUrg) {
+    elUrg.textContent = res.urgency;
+    elUrg.className = "badge " + getUrgencyBadgeClass(res.urgency, res.score);
+  }
+}
+
+async function submitDashQuickTriage() {
+  const input = document.getElementById("dash-quick-triage-input");
+  const text = input ? input.value.trim() : "";
+  if (!text) {
+    showToast("Please enter or select a complaint to triage", "warning");
+    return;
+  }
+
+  const analysis = triageTextClientSide(text);
+  const newGrievance = {
+    id: Date.now(),
+    ticket_number: `MS-${Math.floor(1000 + Math.random() * 9000)}`,
+    passenger_name: "Commuter (Quick Triage)",
+    station_id: 1,
+    station_name: "Old High Court",
+    channel: "Station Kiosk",
+    raw_text: text,
+    detected_language: analysis.language,
+    department: analysis.department,
+    urgency_level: analysis.urgency,
+    urgency_score: analysis.score,
+    urgency_reason: `On-Device NLP detected ${analysis.language} complaint routed to ${analysis.department}.`,
+    sentiment: "Urgent",
+    draft_reply: generateDefaultDraft({ detected_language: analysis.language, ticket_number: `MS-${Date.now()}` }),
+    status: "Open",
+    reported_at: new Date().toISOString()
+  };
+
+  if (state.isOnline) {
+    try {
+      const res = await fetch("/api/complaints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          passenger_name: newGrievance.passenger_name,
+          channel: newGrievance.channel,
+          raw_text: newGrievance.raw_text,
+          station_id: 1,
+          department: newGrievance.department,
+          urgency_level: newGrievance.urgency_level
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.complaint && data.complaint.id) {
+          newGrievance.id = data.complaint.id;
+        }
+      } else {
+        queueOfflineCreation(newGrievance);
+      }
+    } catch (e) {
+      queueOfflineCreation(newGrievance);
+    }
+  } else {
+    queueOfflineCreation(newGrievance);
+  }
+
+  state.complaints.unshift(newGrievance);
+  localStorage.setItem("metrosetu_cached_complaints", JSON.stringify(state.complaints));
+  state.selectedComplaintId = newGrievance.id;
+  if (input) input.value = "";
+  showToast(`✓ Triaged as ${analysis.urgency} (${analysis.language} → ${analysis.department})`, "success");
+  window.location.hash = "#triage";
 }
 
 function renderKPIs(kpis) {
@@ -429,8 +584,8 @@ function renderRidershipAndForecastChart(historyData, forecastData) {
         {
           label: "Actual Hourly Ridership (Pax)",
           data: historicalSeries,
-          borderColor: "#06b6d4",
-          backgroundColor: "rgba(6, 182, 212, 0.15)",
+          borderColor: "#ea580c",
+          backgroundColor: "rgba(234, 88, 12, 0.14)",
           borderWidth: 2.5,
           tension: 0.3,
           fill: true,
@@ -439,8 +594,8 @@ function renderRidershipAndForecastChart(historyData, forecastData) {
         {
           label: "On-Device AI 24h Forecast",
           data: projectedSeries,
-          borderColor: "#a855f7",
-          backgroundColor: "rgba(168, 85, 247, 0.05)",
+          borderColor: "#f59e0b",
+          backgroundColor: "rgba(245, 158, 11, 0.08)",
           borderWidth: 2.5,
           borderDash: [5, 5],
           tension: 0.3,
@@ -449,7 +604,7 @@ function renderRidershipAndForecastChart(historyData, forecastData) {
         {
           label: "Upper 95% Bound",
           data: upperSeries,
-          borderColor: "rgba(168, 85, 247, 0.3)",
+          borderColor: "rgba(234, 88, 12, 0.35)",
           borderWidth: 1,
           borderDash: [2, 2],
           pointRadius: 0,
@@ -458,7 +613,7 @@ function renderRidershipAndForecastChart(historyData, forecastData) {
         {
           label: "Lower 95% Bound",
           data: lowerSeries,
-          borderColor: "rgba(168, 85, 247, 0.3)",
+          borderColor: "rgba(234, 88, 12, 0.35)",
           borderWidth: 1,
           borderDash: [2, 2],
           pointRadius: 0,
