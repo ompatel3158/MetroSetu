@@ -20,10 +20,11 @@
 6. [PWA Installation ("Add to Home Screen")](#-pwa-installation-add-to-home-screen)
 7. [On-Device NLP Engine Architecture](#-on-device-nlp-engine-architecture)
 8. [Dual Database Architecture (UltSQL + SQLite Fallback)](#-dual-database-architecture)
-9. [Automated Test Suite & Verification](#-automated-test-suite--verification)
-10. [Live 2-Minute Judge Demonstration Script](#-live-2-minute-judge-demonstration-script)
-11. [Project Structure](#-project-structure)
-12. [Git Workflow & Repository](#-git-workflow--repository)
+9. [How to Install & Run UltSQL](#-how-to-install--run-ultsql-optional-high-performance-engine)
+10. [Automated Test Suite & Verification](#-automated-test-suite--verification)
+11. [Live 2-Minute Judge Demonstration Script](#-live-2-minute-judge-demonstration-script)
+12. [Project Structure](#-project-structure)
+13. [Git Workflow & Repository](#-git-workflow--repository)
 
 ---
 
@@ -218,6 +219,64 @@ flowchart LR
    curl http://localhost:8000/api/db/engine
    ```
    *Response:* `{"engine": "SQLite", "status": "active", "fallback": true, ...}`
+
+---
+
+## ⚡ How to Install & Run UltSQL (Optional High-Performance Engine)
+
+**UltSQL** is a pure-Dart multimodal database engine combining Relational SQL, NoSQL JSON collections, Key-Value caching, and AI Vector search with zero dynamic C/C++ dependencies. MetroSetu supports UltSQL out of the box with zero-configuration fallback to SQLite.
+
+### 1. Install the Python Client
+The Python client is included in `requirements.txt`:
+```bash
+pip install ultsql
+```
+
+### 2. Run the UltSQL REST Daemon
+
+You have two simple ways to launch the UltSQL engine on port 8080:
+
+#### Option A: Using the Pre-Compiled Standalone Binary (Windows — Zero Dart required)
+The repository includes a compiled, zero-dependency `ultsql.exe` binary:
+```powershell
+.\ultsql.exe serve --port=8080 --db=./ultsql_data
+```
+*(Starts the UltSQL REST daemon immediately on `http://localhost:8080` with zero installation).*
+
+#### Option B: Using Dart SDK (Cross-Platform: Windows, Linux, macOS)
+If you have the [Dart SDK](https://dart.dev/get-dart) installed:
+```bash
+# If using the global pub package:
+dart pub global activate ultsql
+ultsql serve --port=8080 --db=./ultsql_data
+
+# OR if running directly from source:
+dart run bin/ultsql_cli.dart serve --port=8080 --db=./ultsql_data
+```
+
+### 3. Verify UltSQL is Active
+With the daemon running in a separate terminal:
+```bash
+# Check daemon health
+curl http://localhost:8080/health
+
+# Check MetroSetu active engine status
+curl http://localhost:8000/api/db/engine
+```
+*Expected output from MetroSetu:*
+```json
+{
+  "engine": "UltSQL",
+  "status": "connected",
+  "host": "http://localhost:8080",
+  "fallback": false
+}
+```
+
+### 4. What Happens if UltSQL is Stopped?
+You never have to worry about connection crashes:
+- If `ultsql.exe` is closed or not installed, [`db.py`](file:///b:/temp/db.py) **silently falls back to embedded SQLite (`metro.db`)**.
+- The entire application continues functioning 100% uninterrupted.
 
 ---
 
