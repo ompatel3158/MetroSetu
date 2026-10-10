@@ -1,109 +1,294 @@
 # MetroSetu // મેટ્રો સેતુ (Transit Grievance Ops)
 
 > **Gujarat Metro Hacks (DevFest Gandhinagar) — Problem Statement PS-07: "Every Complaint Heard"**  
-> *An on-device, 100% offline-first multilingual grievance triage platform with dual-engine persistence (UltSQL + SQLite).*
+> *100% Offline-First Multilingual Passenger Grievance Triage with Dual-Engine Persistence (UltSQL + SQLite).*
 
-[![GitHub](https://img.shields.io/badge/GitHub-MetroSetu-10b981?logo=github)](https://github.com/ompatel3158/MetroSetu)
+[![GitHub](https://img.shields.io/badge/GitHub-ompatel3158%2FMetroSetu-10b981?logo=github)](https://github.com/ompatel3158/MetroSetu.git)
 [![Offline First](https://img.shields.io/badge/Architecture-100%25%20Offline-06b6d4)](#offline-first-architecture)
-[![Python](https://img.shields.io/badge/Backend-FastAPI%20%2B%20Python-3b82f6)](#quickstart)
-[![Languages](https://img.shields.io/badge/Languages-Gujarati%20%7C%20Hindi%20%7C%20Gujlish%20%7C%20English-8b5cf6)](#on-device-nlp-engine)
+[![Python](https://img.shields.io/badge/Backend-FastAPI%203.10%2B-3b82f6)](#quickstart-setup-guide)
+[![NLP Engine](https://img.shields.io/badge/NLP-Pure%20Python%20%280%20APIs%29-8b5cf6)](#on-device-nlp-engine)
+[![Languages](https://img.shields.io/badge/Languages-Gujarati%20%7C%20Hindi%20%7C%20Gujlish%20%7C%20English-f59e0b)](#language-and-script-coverage)
 
 ---
 
-## 🚇 The Problem (PS-07: Every Complaint Heard)
-
-On board the Gujarat Metro (Ahmedabad – Gandhinagar corridor), passenger complaints arrive through mobile apps, social media, QR portals, and paper forms written in **Gujarati (`ગુજરાતી`)**, **Hindi (`हिंदी`)**, **English**, and mixed **"Gujlish"** (phonetic Gujarati in English alphabet, e.g. *"Lift bandh che, vruddh loko atvayela che"*).
-
-Manual sorting by urgency and department takes hours, and **station controllers working in underground tunnels or station control rooms frequently have zero network connectivity**. Urgent safety hazards and trapped passengers get buried under routine ticketing inquiries.
-
----
-
-## 💡 The Solution: MetroSetu (મેટ્રો સેતુ)
-
-**MetroSetu** is a zero-cloud-dependency, on-device operations console that:
-1. **Detects Language & Script in <5ms**: Native Unicode script ranges + Gujlish phonetic token analysis.
-2. **Prioritizes Urgency**: Automatic scoring from **P1 Critical (5)** (immediate safety hazard, trapped commuters) down to **P4 Low (1-2)** (routine queries) with plain-language diagnostic reasoning.
-3. **Routes to 5 Department Queues**:
-   - 🚨 **Safety** (fires, electrical sparks, platform overcrowding)
-   - 🛗 **Lifts & Escalators** (trapped passengers, out-of-order escalators)
-   - 🧹 **Cleanliness** (washrooms, platform trash, paan stains)
-   - 🎫 **Fare & Ticketing** (UPI deduction failure, turnstile gates, TVM errors)
-   - 👤 **Staff Behaviour** (counter conduct, shouting guards)
-4. **Synthesizes Empathetic Draft Replies**: Produces polite, culturally tailored responses in the complainant's language with station context.
-5. **Dual-Engine Graceful Fallback**: Probes **UltSQL** on startup; automatically falls back to embedded **SQLite** with zero downtime or config changes.
-6. **100% Offline PWA**: Installable on phones and tablets ("Add to Home Screen"), backed by a Service Worker and offline action queue.
+## 📑 Table of Contents
+1. [The Problem Statement (PS-07)](#-the-problem-statement-ps-07)
+2. [What is MetroSetu?](#-what-is-metrosetu)
+3. [Quickstart Setup Guide (Zero to Running in 2 Minutes)](#-quickstart-setup-guide)
+4. [Step-by-Step Environment Setup](#-step-by-step-environment-setup)
+5. [Running from a Mobile Phone on the Train](#-running-from-a-mobile-phone-on-the-train)
+6. [PWA Installation ("Add to Home Screen")](#-pwa-installation-add-to-home-screen)
+7. [On-Device NLP Engine Architecture](#-on-device-nlp-engine-architecture)
+8. [Dual Database Architecture (UltSQL + SQLite Fallback)](#-dual-database-architecture)
+9. [Automated Test Suite & Verification](#-automated-test-suite--verification)
+10. [Live 2-Minute Judge Demonstration Script](#-live-2-minute-judge-demonstration-script)
+11. [Project Structure](#-project-structure)
+12. [Git Workflow & Repository](#-git-workflow--repository)
 
 ---
 
-## 🚀 Quickstart: Exact Run Commands
+## 🚇 The Problem Statement (PS-07)
 
-### 1. Install Dependencies
+On board the **Gujarat Metro (Ahmedabad – Gandhinagar)**, passenger grievances arrive through mobile applications, email, paper forms, and social media written in **Gujarati (`ગુજરાતી`)**, **Hindi (`हिंदी`)**, **English**, and mixed **"Gujlish"** (phonetic transliterated Gujarati in Latin alphabet, e.g. *"Lift bandh che Kalupur par, senior citizen atvayela che"*).
+
+### Critical Hackathon Constraints:
+- **Zero Network in Tunnels**: The hackathon takes place on an active moving train. In underground tunnels and remote track sectors, network coverage drops to zero.
+- **Urgent Issues Get Buried**: Critical safety hazards (fires, live wires, trapped passengers) get mixed in with routine timetable inquiries.
+- **Station Controller Pain Point**: Station controllers in underground equipment rooms need to triage, prioritize, and respond to grievances **without internet access**.
+
+---
+
+## 💡 What is MetroSetu?
+
+**MetroSetu (મેટ્રો સેતુ)** is a zero-cloud-dependency, on-device operations console built for station controllers and transit supervisors:
+
+- **⚡ Sub-5ms Language & Script Classification**: Detects Gujarati, Hindi, English, and Gujlish locally using Unicode ranges and phonetic tokens.
+- **🚨 Automated Urgency Matrix**: Categorizes complaints into **P1 Critical (5)** (<15 min SLA), **P2 High (4)** (<1 hour SLA), **P3 Medium (3)** (<4 hour SLA), and **P4 Low (1-2)** (<24 hour SLA) with plain-English diagnostic reasoning.
+- **🏢 5 Department Routing Queues**:
+  1. 🚨 **Safety & Security** (fire, electrical sparks, medical emergencies, assault)
+  2. 🛗 **Lifts & Escalators** (trapped passengers, broken escalators, wheelchair access)
+  3. 🧹 **Cleanliness & Sanitation** (restrooms, paan stains, garbage, water leaks)
+  4. 🎫 **Fare & Ticketing** (UPI deduction failure, turnstile gates, TVM errors)
+  5. 👤 **Staff Behaviour** (counter conduct, shouting guards, overcharging)
+- **✍️ Multilingual Empathetic Draft Replies**: Synthesizes polite, official replies in the passenger’s language with station context.
+- **💾 Dual-Engine Persistence**: Connects to high-speed **UltSQL** when available, with automatic and silent fallback to embedded **SQLite (`metro.db`)**.
+- **📱 100% Offline PWA**: Installable standalone mobile app with local action queueing and sync when connectivity returns.
+
+---
+
+## ⚡ Quickstart Setup Guide
+
+If you just want to run the project immediately:
+
 ```bash
+# 1. Clone the repository
+git clone https://github.com/ompatel3158/MetroSetu.git
+cd MetroSetu
+
+# 2. Install dependencies (only FastAPI & Uvicorn needed)
 pip install -r requirements.txt
-```
-*(Only `fastapi` and `uvicorn` required; all NLP and database engines run on Python standard library).*
 
-### 2. Seed Realistic Gujarat Metro Data
-Populates 10 Gujarat Metro stations, 1,680 hours of ridership telemetry, 80 assets, and **37 realistic multilingual complaints**:
-```bash
+# 3. Seed realistic Gujarat Metro stations and 37 multilingual complaints
 python seed.py
-```
 
-### 3. Run the Automated Test Suite (100% Offline)
-Verifies NLP accuracy across Gujarati, Hindi, Gujlish, and English, plus database CRUD and API endpoints:
-```bash
+# 4. Run the automated verification suite (100% offline)
 python test_triage.py
-```
-*(Expected output: `NLP Accuracy: 17/17 (100.0%) - ALL TESTS PASSED`)*
 
-### 4. Launch the Localhost Operations Server
-```bash
+# 5. Launch the local server
 python -m uvicorn main:app --reload --port 8000
 ```
 
-### 5. Open in Your Browser
-- **Operations Console**: `http://localhost:8000/#triage`
-- **Full Dashboard**: `http://localhost:8000/#dashboard`
-- **Mobile Access**: Open `http://<laptop-ip>:8000` from any smartphone connected to your local hotspot.
+Open your browser to: **`http://localhost:8000/#triage`**
 
 ---
 
-## 🎪 Live Judge Demo Script (2 Minutes on the Train)
+## 🛠️ Step-by-Step Environment Setup
 
-When presenting to judges on board the Gujarat Metro:
+### Prerequisites
+- Python **3.10 or newer** (tested and verified on Python 3.14).
+- Modern web browser (Chrome, Edge, Firefox, Safari).
+- Git.
 
-1. **Turn OFF Wi-Fi / Hotspot** on your laptop to prove 100% offline functionality.
-2. Navigate to `http://localhost:8000/#triage`.
-3. In the **Test Batch Simulator Drawer** at the top, click any of the 1-click test buttons:
-   - 🇬🇯 **Gujarati**: *"લિફ્ટ બંધ છે અને વરિષ્ઠ નાગરિકો ફસાયા છે!"* &rarr; Instant **P1 Critical &rarr; Lifts & Escalators**.
-   - 🔤 **Gujlish**: *"Water leakage chhe Kalupur station par, loko slip thavay che"* &rarr; Instant **P1 Critical &rarr; Safety**.
-   - 🇮🇳 **Hindi**: *"TVM मशीन में ₹100 कट गए पर टिकट नहीं आया"* &rarr; Instant **P2 High &rarr; Fare & Ticketing**.
-   - 🇬🇧 **English**: *"Platform screen door failed to open at Motera"* &rarr; Instant **P2 High &rarr; Lifts & Escalators**.
-4. Click on the newly triaged card:
-   - Observe the **Urgency Score Meter (100/100)** and **SLA target (<15 min)**.
-   - Inspect the **On-Device AI Diagnostic Reasoning**.
-   - Review the **Auto-Drafted Response** in the passenger's language.
-5. Click **"Dispatch Reply & Resolve"**:
-   - The ticket updates instantly to `Resolved`.
-   - If offline, the mutation is queued in `localStorage` and automatically syncs when the server reconnects!
+### 1. Create a Python Virtual Environment (Recommended)
+
+#### Windows (PowerShell):
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+```
+
+#### Linux / macOS:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+### 2. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+*Contents of `requirements.txt`:*
+```
+fastapi>=0.110.0
+uvicorn>=0.28.0
+```
+*(Notice: Zero heavy ML frameworks like PyTorch or TensorFlow, and zero external cloud SDKs. All NLP and database operations use the Python Standard Library).*
+
+### 3. Initialize & Seed the Database
+```bash
+python seed.py
+```
+This script creates `metro.db` with:
+- **10 Gujarat Metro Stations**: Motera Stadium, Kalupur Railway Station, APMC, Gandhinagar Capital, Old High Court Interchange, Thaltej, Gujarat University, Infocity Gandhinagar, Kankaria East, Sabarmati.
+- **1,680 Hours of Ridership Telemetry**: 7 days of realistic passenger commute curves with synthetic rush-hour anomalies.
+- **80 Equipment Assets**: Escalators, elevators, signaling relays, transformers, and turnstiles with health scores.
+- **7 Fault Events**: Historical and active infrastructure incidents.
+- **12 Feeder Bus Routes**: Connecting stations to nearby business and academic hubs.
+- **37 Multilingual Complaints**: Real-world grievances in Gujarati, Hindi, English, and Gujlish across all 5 departments.
+
+### 4. Start the Application Server
+```bash
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+- Access locally: `http://localhost:8000`
+- Access on local network: `http://<your-ip>:8000`
 
 ---
 
-## 🏗️ Architecture
+## 📱 Running from a Mobile Phone on the Train
+
+During the hackathon ride on the metro train, you can use your laptop as a local server and access the full UI from smartphones without an internet connection:
+
+1. **Turn on Mobile Hotspot** on your phone (or create a local ad-hoc Wi-Fi network). Connect your laptop to this hotspot.
+   *(Internet access is NOT required; only local Wi-Fi communication).*
+2. **Find your Laptop's Local IP Address**:
+   - **Windows**: Run `ipconfig` in PowerShell and look for `IPv4 Address` (e.g. `192.168.43.120`).
+   - **Linux / Mac**: Run `ifconfig` or `ip a` (e.g. `192.168.1.50`).
+3. **Start Uvicorn with `--host 0.0.0.0`**:
+   ```bash
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000
+   ```
+4. **Open the Browser on Any Phone**:
+   Navigate to `http://192.168.43.120:8000/#triage`.
+5. The full MetroSetu console loads instantly on the phone!
+
+---
+
+## 📲 PWA Installation ("Add to Home Screen")
+
+MetroSetu includes a Web App Manifest ([`static/manifest.json`](file:///b:/temp/static/manifest.json)) and a Service Worker ([`static/sw.js`](file:///b:/temp/static/sw.js)):
+
+1. Open `http://localhost:8000` (or `http://<ip>:8000`) in Chrome or Safari.
+2. In Chrome: Click the **Install** icon in the address bar (or Menu &rarr; **Add to Home screen**).
+3. In Safari (iOS): Tap the **Share** button &rarr; **Add to Home Screen**.
+4. MetroSetu launches as a **standalone native app** without browser address bars, complete with offline icons and launch shortcuts.
+
+---
+
+## 🧠 On-Device NLP Engine Architecture
+
+The NLP engine ([`ai_engine.py`](file:///b:/temp/ai_engine.py)) runs 100% locally in Python without any external API keys or models:
+
+### 1. Language & Script Coverage
+- **Gujarati (`ગુજરાતી`)**: Evaluates characters within the Unicode block `U+0A80` through `U+0AFF`.
+- **Hindi (`हिंदी`)**: Evaluates characters within the Devanagari block `U+0900` through `U+097F`.
+- **Gujlish**: Evaluates Latin text for phonetic Gujarati tokens (`che`, `chhe`, `nathi`, `chokhkhaai`, `bhaadu`, `bandh`, `atvayela`, `fasayela`, `kem`, `karvanu`, `dhuvado`, `jokham`, `loko`, `paisa`).
+- **English**: Standard Latin transit lexicon.
+
+### 2. Department Keyword Matrices
+- **Safety**: `fire`, `smoke`, `wire`, `shock`, `spark`, `blood`, `fight`, `theft`, `chori`, `maar`, `aag`, `dhuvado`, `dhakka`, `emergency`.
+- **Lifts & Escalators**: `lift`, `elevator`, `escalator`, `stuck`, `broken`, `wheelchair`, `ramp`, `atvayela`, `fasayela`, `pagathiya`, `bandh`.
+- **Cleanliness**: `dirty`, `smell`, `garbage`, `toilet`, `washroom`, `kachro`, `badbu`, `gandki`, `chokhkhaai`, `paan`, `spit`.
+- **Fare & Ticketing**: `ticket`, `token`, `fare`, `bhaadu`, `upi`, `qr`, `deducted`, `refund`, `gate`, `turnstile`, `tvm`, `paisa`.
+- **Staff Behaviour**: `staff`, `rude`, `guard`, `shout`, `misbehave`, `badtameezi`, `gussa`, `counter`.
+
+### 3. Urgency Scoring Algorithm
+```python
+# ai_engine.py logic
+if has_life_safety_hazard or trapped_in_lift:
+    score = 5  # P1 Critical (SLA: < 15 mins)
+elif accessibility_block or aggressive_behavior:
+    score = 4  # P2 High (SLA: < 1 hour)
+elif sanitation_failure or fare_deduction_error:
+    score = 3  # P3 Medium (SLA: < 4 hours)
+else:
+    score = 1 or 2  # P4 Low (SLA: < 24 hours)
+```
+
+---
+
+## 💾 Dual Database Architecture
+
+All database queries are strictly routed through [`db.py`](file:///b:/temp/db.py). Neither [`main.py`](file:///b:/temp/main.py) nor [`ai_engine.py`](file:///b:/temp/ai_engine.py) import `sqlite3` or run raw SQL.
+
+```mermaid
+flowchart LR
+    A["FastAPI Routes (main.py)"] --> B["Database Abstraction Layer (db.py)"]
+    B --> C{"UltSQL Probe (localhost:8080)"}
+    C -->|Daemon Running| D["UltSQL High-Speed Multimodal Engine"]
+    C -->|Daemon Offline / Error| E["Embedded SQLite Engine (metro.db)"]
+```
+
+### Automatic Fallback Behavior:
+1. On startup or first query, `db.py` checks `http://localhost:8080/health`.
+2. **If UltSQL is running**: Queries use UltSQL for high-speed persistence.
+3. **If UltSQL is offline**: `db.py` silently falls back to SQLite (`metro.db`) with zero downtime.
+4. You can check the active database engine at any time:
+   ```bash
+   curl http://localhost:8000/api/db/engine
+   ```
+   *Response:* `{"engine": "SQLite", "status": "active", "fallback": true, ...}`
+
+---
+
+## 🧪 Automated Test Suite & Verification
+
+Run the comprehensive integration test suite to verify the entire system:
+
+```bash
+python test_triage.py
+```
+
+### What `test_triage.py` Verifies:
+1. **Database Engine Probe**: Confirms UltSQL check and SQLite fallback integrity.
+2. **NLP Triage Accuracy**: Evaluates 17 pre-defined test cases across Gujarati, Hindi, Gujlish, and English with strict assertion for language, department, and draft reply script.
+3. **Database CRUD Operations**: Tests complaint insertion, status transitions to `Resolved`, and real-time KPI aggregations.
+4. **FastAPI Endpoints**: Directly tests 7 REST routes including `/api/complaints/triage` and `/api/complaints/kpis`.
+
+---
+
+## 🎪 Live 2-Minute Judge Demonstration Script
+
+Follow these steps when judges visit your team on board the Gujarat Metro:
+
+### Step 1: Disconnect Internet (The "Hook")
+- **Action**: Turn off Wi-Fi on your laptop in front of the judges.
+- **Say**: *"Judges, we are in an underground tunnel with zero connectivity. MetroSetu is built 100% offline-first. Watch as we triage multilingual passenger grievances on-device."*
+
+### Step 2: Open the Triage Console
+- **Action**: Open `http://localhost:8000/#triage`.
+- **Point Out**: Notice the **`🟢 ONLINE (Localhost)`** indicator and the department queues for **Safety**, **Lifts**, **Cleanliness**, **Fare**, and **Staff**.
+
+### Step 3: Trigger the 1-Click Test Simulator
+- **Action**: Click the **"🇬🇯 Gujarati"** sample button in the top drawer.
+- **Observe**: A new card instantly appears in the queue:
+  - **Text**: *"મોટેરા સ્ટેડિયમ પ્લેટફોર્મ ૧ પર લિફ્ટ અચાનક બંધ પડી ગઈ છે અને વરિષ્ઠ નાગરિકો ફસાયા છે!"*
+  - **Classification**: **`P1 Critical`** &rarr; **`🛗 Lifts & Escalators`** (Latency: <5ms).
+  - **Language Badge**: Emerald `Gujarati` badge.
+
+### Step 4: Inspect the AI Reasoning & Trilingual Reply
+- **Action**: Click on the complaint card to open the Inspector on the right.
+- **Show Judges**:
+  - The **Urgency Score Meter (100/100)** with **SLA target (<15 min)**.
+  - The **AI Diagnostic**: *"Trapped passengers detected in lift/elevator; immediate rescue dispatch required."*
+  - The **Auto-Drafted Response** in fluent, polite Gujarati:
+    *"નમસ્તે... મોટેરા સ્ટેડિયમ સ્ટેશન પર Lifts & Escalators સંબંધિત તમારી ફરિયાદ બદલ અમે ક્ષમાપ્રાર્થી છીએ... અમારી ટેકનિકલ ટીમને તાત્કાલિક રવાના કરવામાં આવી છે..."*
+
+### Step 5: Test Gujlish & Hindi
+- **Action**: Click the **"🔤 Gujlish"** and **"🇮🇳 Hindi"** test buttons.
+- **Show Judges**: MetroSetu seamlessly understands transliterated Gujlish (*"Water leakage chhe Kalupur par..."*) and routes it to **Safety** with P1 urgency!
+
+### Step 6: Dispatch & Resolve
+- **Action**: Edit the response text slightly in the studio and click **"Dispatch Reply & Resolve"**.
+- **Observe**: The ticket marks as `Resolved` in real-time, the SLA counter updates, and the action is saved locally.
+
+---
+
+## 📁 Project Structure
 
 ```
-b:\temp\
-├── main.py                 # FastAPI backend, REST API endpoints, PWA router
+├── README.md               # Complete setup, architecture & demo guide
+├── requirements.txt        # Backend dependencies (fastapi, uvicorn)
 ├── db.py                   # Single DB abstraction: UltSQL probe + SQLite fallback
 ├── ai_engine.py            # Pure Python on-device Multilingual NLP Engine
-├── seed.py                 # Seeder CLI (stations, telemetry, multilingual complaints)
-├── test_triage.py          # Integration test runner (100% NLP test coverage)
-├── requirements.txt        # fastapi, uvicorn
+├── seed.py                 # CLI seeder (10 stations, 1,680h telemetry, 37 complaints)
+├── test_triage.py          # Automated verification test suite (17/17 NLP test cases)
+├── metro.db                # Local SQLite database
 ├── .gitignore              # Clean git tracking
 └── static/
     ├── index.html          # Single-Page UI (Dashboard, Stations, Triage Console, Alerts)
-    ├── manifest.json       # PWA Web Manifest (installable mobile app)
-    ├── sw.js               # Service Worker (pre-cached app shell & API fallback)
+    ├── manifest.json       # PWA Web Manifest (Add to Home Screen)
+    ├── sw.js               # Service Worker (pre-cached shell & offline API fallback)
     ├── icon-192.svg        # 192x192 transit icon
     ├── icon-512.svg        # 512x512 transit icon
     ├── css/
@@ -115,30 +300,35 @@ b:\temp\
 
 ---
 
-## 🧠 On-Device NLP Engine Details
+## 🔗 Git Workflow & Repository
 
-### Language & Script Detection
-- **Gujarati (`\u0A80` - `\u0AFF`)**: Detected via character frequency ratio ($\ge 12\%$).
-- **Hindi (`\u0900` - `\u097F`)**: Detected via Devanagari character frequency ratio ($\ge 12\%$).
-- **Gujlish**: Detected via phonetic transliteration token matching (`che`, `chhe`, `nathi`, `chokhkhaai`, `bhaadu`, `bandh`, `atvayela`, `fasayela`, `kem`, `karvanu`, `dhuvado`, `jokham`, etc.).
-- **English**: Standard Latin text syntax.
+- **Repository**: [https://github.com/ompatel3158/MetroSetu.git](https://github.com/ompatel3158/MetroSetu.git)
+- **Primary Branch**: `main`
 
-### Urgency Matrix
-- **P1 Critical (Score 5)**: Life safety hazards, fire, smoke, electric shock, trapped passengers in lifts. SLA: Immediate (<15 mins).
-- **P2 High (Score 4)**: Escalator outages affecting disabled/elderly passengers, active water leakage, physical intimidation. SLA: <1 hour.
-- **P3 Medium (Score 3)**: Restroom sanitation, TVM currency deduction failure, turnstile gate malfunction. SLA: <4 hours.
-- **P4 Low (Score 1-2)**: Timetable questions, lost item inquiries, general feedback. SLA: <24 hours.
+### Routine Git Commands
+```bash
+# Check status
+git status
 
----
+# Stage and commit updates
+git add .
+git commit -m "feat: your update message"
 
-## 📦 Dual Database Support
-
-[`db.py`](file:///b:/temp/db.py) implements transparent dual-engine persistence:
-1. **UltSQL**: When the Dart-based UltSQL daemon is active on `http://localhost:8080`, queries route to UltSQL.
-2. **SQLite (`metro.db`)**: If the UltSQL daemon is offline or unreachable, `db.py` seamlessly executes against local SQLite with zero errors or downtime.
+# Push to GitHub
+git push origin main
+```
 
 ---
 
-## 👥 Hackathon Team
-Built for **Metro Hacks @ DevFest Gandhinagar** by Om Patel.
-Repository: [https://github.com/ompatel3158/MetroSetu.git](https://github.com/ompatel3158/MetroSetu.git)
+## 🏆 Summary: Why MetroSetu Wins PS-07
+
+| Judging Criterion | MetroSetu Implementation |
+|---|---|
+| **Relevance to Operator** | Directly addresses station controllers handling multilingual grievances in underground stations. |
+| **Working Prototype** | End-to-end working system: ingestion &rarr; NLP classification &rarr; queue routing &rarr; draft reply &rarr; resolution. |
+| **Resilience (100% Offline)** | Zero external CDNs, zero cloud APIs, local SQLite/UltSQL, Service Worker caching, and offline mutation queueing. |
+| **Technical Depth** | Pure-Python multilingual NLP handling Unicode Gujarati, Hindi, and transliterated Gujlish in <5ms. |
+| **PPP & Feasibility** | Ready to integrate into Gujarat Metro Rail Corporation (GMRC) passenger portals and station control rooms. |
+
+---
+*Built with ❤️ for DevFest Gandhinagar · Metro Hacks 2026 by Om Patel.*
